@@ -1,0 +1,113 @@
+name: CoreSkyblock
+version: 1.0
+main: be.RedSwick.skyblock.SkyBlockPlugin
+api-version: '1.21'
+
+commands:
+  bal:
+    description: Voir son solde de coins, essence et gemmes
+    usage: /bal [joueur]
+  pay:
+    description: Envoyer des coins à un joueur
+    usage: /pay <joueur> <montant>
+  essence:
+    description: Voir son solde d'essence
+    usage: /essence
+  baltop:
+    description: Classement des joueurs les plus riches
+    usage: /baltop
+  setbal:
+    description: Définir le solde de coins d'un joueur (admin)
+    usage: /setbal <joueur> <montant>
+  setgems:
+    description: Définir les gemmes d'un joueur (admin)
+    usage: /setgems <joueur> <montant>
+  shop:
+    description: Ouvrir la boutique
+    usage: /shop
+  spawn:
+    description: Teleportation au spawn
+  is:
+    description: Commande principale Skyblock
+  rang:
+    description: Voir et upgrader son rang
+    aliases: [rank]
+  grade:
+    description: Voir les grades disponibles
+  job:
+    description: Voir ses metiers
+    aliases: [metier, jobs]
+  warp:
+    description: Voir les warps des iles
+  setstaffgrade:
+    description: Assigner un grade staff à un joueur
+    usage: /setstaffgrade <joueur> <grade>
+  arc:
+    description: Commandes admin Arcanium
+    usage: /arc <give|setrank|setgrade|island|job|item|reload>
+  mute:
+    description: Muter un joueur
+    usage: /mute <joueur> <minutes> [raison]
+  unmute:
+    description: Démuter un joueur
+    usage: /unmute <joueur>
+  kick:
+    description: Expulser un joueur
+    usage: /kick <joueur> [raison]
+  ban:
+    description: Bannir un joueur définitivement
+    usage: /ban <joueur> [raison]
+  unban:
+    description: Débannir un joueur
+    usage: /unban <joueur>
+  tempban:
+    description: Bannir temporairement
+    usage: /tempban <joueur> <jours> [raison]
+  warn:
+    description: Avertir un joueur
+    usage: /warn <joueur> <raison>
+  warns:
+    description: Voir les avertissements
+    usage: /warns <joueur>
+  stafflogs:
+    description: Voir les logs des staffs
+    usage: /stafflogs
+  vanish:
+    description: Devenir invisible
+    usage: /vanish
+  classement:
+    description: Voir les classements
+    usage: /classement [type]
+    aliases: [top, leaderboard, lb]
+  holo:
+    description: Gérer les hologrammes de classement
+    usage: /holo <spawn|remove|refresh|list> [type]
+  tp:
+    description: TP sur un joueur (bypass is close)
+    usage: /tp <joueur>
+  tphere:
+    description: TP un joueur à soi
+    usage: /tphere <joueur>
+  tpisland:
+    description: TP sur l'île d'un joueur (bypass close)
+    usage: /tpisland <joueur>
+  serverclose:
+    description: Fermer le serveur aux joueurs
+    usage: /serverclose
+  serveropen:
+    description: Ouvrir le serveur
+    usage: /serveropen
+
+permissions:
+  arcanium.admin:
+    description: Accès aux commandes admin Arcanium
+    default: false
+  arcanium.mod:
+    description: Accès aux commandes de modération
+    default: false
+  arcanium.guide:
+    description: Accès aux commandes de guide
+    default: false
+  arcanium.fondateur:
+    description: Accès total fondateur
+    default: false
