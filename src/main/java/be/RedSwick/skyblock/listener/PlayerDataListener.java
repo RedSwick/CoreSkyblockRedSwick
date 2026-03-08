@@ -68,6 +68,7 @@ public class PlayerDataListener implements Listener {
 
         pdm.savePlayer(player.getUniqueId());
         SkyBlockPlugin.getInstance().getBossBarManager().removeBar(player);
+        SkyBlockPlugin.getInstance().getScoreboardManager().removePlayer(player.getUniqueId());
         pdm.unloadPlayer(player.getUniqueId());
         be.RedSwick.skyblock.command.ModerationCommand.Vanish.vanished
                 .remove(player.getUniqueId());
