@@ -2,6 +2,7 @@ name: CoreSkyblock
 version: 1.0
 main: be.RedSwick.skyblock.SkyBlockPlugin
 api-version: '1.21'
+softdepend: [WorldEdit]
 
 commands:
   bal:

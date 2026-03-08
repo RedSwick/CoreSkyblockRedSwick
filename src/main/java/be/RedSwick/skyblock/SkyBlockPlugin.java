@@ -25,6 +25,8 @@ public final class SkyBlockPlugin extends JavaPlugin {
     private be.RedSwick.skyblock.leaderboard.LeaderboardManager leaderboardManager;
     private SpawnerManager    spawnerManager;
     private BossBarManager    bossBarManager;
+    private be.RedSwick.skyblock.manager.CooldownManager  cooldownManager;
+    private be.RedSwick.skyblock.manager.SchematicManager schematicManager;
 
     @Override
     public void onEnable() {
@@ -41,6 +43,8 @@ public final class SkyBlockPlugin extends JavaPlugin {
         leaderboardManager = new be.RedSwick.skyblock.leaderboard.LeaderboardManager(this);
         spawnerManager    = new SpawnerManager();
         bossBarManager    = new BossBarManager();
+        cooldownManager   = new be.RedSwick.skyblock.manager.CooldownManager();
+        schematicManager  = new be.RedSwick.skyblock.manager.SchematicManager(this);
 
         // Init managers moderation — AVANT les listeners
         be.RedSwick.skyblock.customitem.CustomItemConfig.get().init();
@@ -217,4 +221,6 @@ public final class SkyBlockPlugin extends JavaPlugin {
     public be.RedSwick.skyblock.leaderboard.LeaderboardManager getLeaderboardManager() { return leaderboardManager; }
     public SpawnerManager  getSpawnerManager()      { return spawnerManager; }
     public BossBarManager  getBossBarManager()       { return bossBarManager; }
+    public be.RedSwick.skyblock.manager.CooldownManager  getCooldownManager()  { return cooldownManager; }
+    public be.RedSwick.skyblock.manager.SchematicManager getSchematicManager() { return schematicManager; }
 }
