@@ -25,7 +25,7 @@ import java.util.*;
 
 public class SpawnerListener implements Listener {
 
-    // \u2500\u2500 Stack count sur le MOB (NBT, survit aux restarts) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // ── Stack count sur le MOB (NBT, survit aux restarts) ──────────────────
     public static final NamespacedKey KEY_STACK =
             new NamespacedKey(SkyBlockPlugin.getInstance(), "stack_count");
 
@@ -44,9 +44,9 @@ public class SpawnerListener implements Listener {
         new be.RedSwick.skyblock.spawner.GlobalSpawnerEngine(manager);
     }
 
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-    //  STACK COUNT API \u2014 NBT sur le mob
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
+    //  STACK COUNT API — NBT sur le mob
+    // ════════════════════════════════════════════════
 
     public static void setStackCount(Entity entity, int amount) {
         PersistentDataContainer pdc = entity.getPersistentDataContainer();
@@ -64,18 +64,18 @@ public class SpawnerListener implements Listener {
         if (e != null) e.getPersistentDataContainer().remove(KEY_STACK);
     }
 
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
     //  HOLOGRAMME MOB
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
 
     public static void updateMobHologram(LivingEntity mob, EntityType type, int amount) {
-        mob.setCustomName("\u00a77" + formatType(type) + " \u00a7fx" + amount);
+        mob.setCustomName("§7" + formatType(type) + " §fx" + amount);
         mob.setCustomNameVisible(amount > 1);
     }
 
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
     //  ITEM SPAWNER
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
 
     public static ItemStack makeSpawnerItem(EntityType type, int amount) {
         ItemStack item = new ItemStack(Material.SPAWNER, amount);
@@ -84,7 +84,7 @@ public class SpawnerListener implements Listener {
         CreatureSpawner cs = (CreatureSpawner) meta.getBlockState();
         cs.setSpawnedType(type);
         meta.setBlockState(cs);
-        meta.setDisplayName("\u00a7e" + formatType(type) + " Spawner");
+        meta.setDisplayName("§e" + formatType(type) + " Spawner");
         item.setItemMeta(meta);
         return item;
     }
@@ -97,12 +97,12 @@ public class SpawnerListener implements Listener {
         return sb.toString().trim();
     }
 
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
     //  HOLOGRAMME SPAWNER (sur le bloc)
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
 
     private void updateSpawnerHologram(Location loc, EntityType type, int count) {
-        String text = "\u00a7e" + formatType(type) + " Spawner \u00a77x\u00a76" + count;
+        String text = "§e" + formatType(type) + " Spawner §7x§6" + count;
         SkyBlockPlugin.getInstance().getHologramManager().setHologram(loc, text);
     }
 
@@ -110,12 +110,41 @@ public class SpawnerListener implements Listener {
         SkyBlockPlugin.getInstance().getHologramManager().removeHologram(loc);
     }
 
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-    //  CLIC DROIT \u2014 EMPILER des spawners sur le bloc
-    //  (m\u00eame type en main + clic sur le spawner pos\u00e9)
-    //  Clic simple  \u2192 +1
-    //  Shift+clic   \u2192 +tout le stack en main
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
+    //  SPAWN EGG — mise à jour du type dans le manager
+    // ════════════════════════════════════════════════
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onSpawnEggUse(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) return;
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+
+        Block clicked = event.getClickedBlock();
+        if (clicked == null || clicked.getType() != Material.SPAWNER) return;
+
+        ItemStack hand = event.getPlayer().getInventory().getItemInMainHand();
+        if (hand == null || !hand.getType().name().endsWith("_SPAWN_EGG")) return;
+
+        String eggName = hand.getType().name().replace("_SPAWN_EGG", "");
+        EntityType newType;
+        try { newType = EntityType.valueOf(eggName); }
+        catch (IllegalArgumentException e) { return; }
+
+        Location loc = clicked.getLocation();
+        String key = SpawnerManager.toKey(loc);
+        SpawnerManager.SpawnerData existing = manager.getAllSpawners().get(key);
+        int count = existing != null ? existing.count() : 1;
+
+        final EntityType finalType = newType;
+        Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(), () -> {
+            manager.addSpawner(loc, finalType, count);
+            if (count > 1) updateSpawnerHologram(loc, finalType, count);
+        });
+    }
+
+    // ════════════════════════════════════════════════
+    //  CLIC DROIT — empiler des spawners sur le bloc
+    // ════════════════════════════════════════════════
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onRightClick(PlayerInteractEvent event) {
@@ -129,9 +158,8 @@ public class SpawnerListener implements Listener {
         ItemStack hand = player.getInventory().getItemInMainHand();
         if (hand.getType() != Material.SPAWNER) return;
 
-        // V\u00e9rifier que les types correspondent
-        EntityType handType    = getSpawnerType(hand);
-        EntityType placedType  = getPlacedType(clicked.getLocation());
+        EntityType handType   = getSpawnerType(hand);
+        EntityType placedType = getPlacedType(clicked.getLocation());
         if (handType == null || placedType == null) return;
         if (handType != placedType) return;
 
@@ -143,18 +171,16 @@ public class SpawnerListener implements Listener {
 
         int toAdd = player.isSneaking() ? hand.getAmount() : 1;
 
-        // ── Vérifier la limite de spawners de l'île ──
         Island island = islandManager.getIslandAtLocation(clicked.getLocation());
         if (island != null) {
-            int limit   = island.getUpgradeValue(IslandUpgrade.SPAWNER_LIMIT);
-            int current = countSpawnersOnIsland(island);
+            int limit     = island.getUpgradeValue(IslandUpgrade.SPAWNER_LIMIT);
+            int current   = countSpawnersOnIsland(island);
             int available = limit - current;
             if (available <= 0) {
                 player.sendMessage("§c✦ Limite de spawners atteinte ! §7(" + current + "§c/§7" + limit + "§7)");
                 player.sendMessage("§7Améliore §e/is upgrade §7pour augmenter la limite.");
                 return;
             }
-            // Limiter toAdd à ce qu'il reste de disponible
             if (toAdd > available) {
                 toAdd = available;
                 player.sendMessage("§e⚠ Seulement §6" + toAdd + " spawner(s) §eajouté(s) — limite atteinte !");
@@ -162,25 +188,23 @@ public class SpawnerListener implements Listener {
         }
 
         int newCount = data.count() + toAdd;
-
         manager.addSpawner(clicked.getLocation(), placedType, newCount);
         updateSpawnerHologram(clicked.getLocation(), placedType, newCount);
 
-        // Retirer de l'inventaire
         if (toAdd >= hand.getAmount()) {
             player.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
         } else {
             hand.setAmount(hand.getAmount() - toAdd);
         }
 
-        ChatUtil.actionBar(player, "\u00a7e" + formatType(placedType) + " Spawner \u00a77x\u00a76" + newCount
-                + "  \u00a77(\u00a7b+" + toAdd + " ajout\u00e9" + (toAdd > 1 ? "s" : "") + "\u00a77)");
+        ChatUtil.actionBar(player, "§e" + formatType(placedType) + " Spawner §7x§6" + newCount
+                + "  §7(§b+" + toAdd + " ajouté" + (toAdd > 1 ? "s" : "") + "§7)");
         player.updateInventory();
     }
 
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-    //  POSE \u2014 premier spawner \u2192 count = 1
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
+    //  POSE — premier spawner → count = 1
+    // ════════════════════════════════════════════════
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
@@ -189,7 +213,6 @@ public class SpawnerListener implements Listener {
         Player   player = event.getPlayer();
         Location loc    = event.getBlockPlaced().getLocation();
 
-        // ── Vérifier la limite de spawners de l'île ──
         Island island = islandManager.getIslandAtLocation(loc);
         if (island != null) {
             int limit   = island.getUpgradeValue(IslandUpgrade.SPAWNER_LIMIT);
@@ -216,10 +239,8 @@ public class SpawnerListener implements Listener {
         });
 
         manager.addSpawner(loc, type, 1);
-        // Pas d'hologramme pour count=1 (vanilla, pas besoin)
     }
 
-    // ── Compte le TOTAL de spawners (stackés compris) dans le rayon de l'île ──
     private int countSpawnersOnIsland(Island island) {
         Location center = island.getCenter();
         int radius      = island.getRadius();
@@ -229,67 +250,76 @@ public class SpawnerListener implements Listener {
             if (l == null || !l.getWorld().equals(center.getWorld())) continue;
             if (Math.abs(l.getBlockX() - center.getBlockX()) <= radius
                     && Math.abs(l.getBlockZ() - center.getBlockZ()) <= radius) {
-                total += entry.getValue().count(); // ← count() pas juste +1
+                total += entry.getValue().count();
             }
         }
         return total;
     }
 
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-    //  CASSE \u2014 r\u00e9cup\u00e8re 1 spawner (shift = tout)
-    //  Bloc physique reste tant que count > 0
-    //  Dispara\u00eet \u00e0 count = 0
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
+    //  CASSE — récupère 1 spawner (shift = tout)
+    // ════════════════════════════════════════════════
+
+    private final Map<String, EntityType> breakTypeCache = new HashMap<>();
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onBreakPre(BlockBreakEvent event) {
+        if (event.getBlock().getType() != Material.SPAWNER) return;
+        Location loc = event.getBlock().getLocation();
+        String cacheKey = SpawnerManager.toKey(loc);
+        SpawnerManager.SpawnerData d = manager.getAllSpawners().get(cacheKey);
+        if (d != null) { breakTypeCache.put(cacheKey, d.type()); return; }
+        if (loc.getBlock().getState() instanceof CreatureSpawner cs && cs.getSpawnedType() != null)
+            breakTypeCache.put(cacheKey, cs.getSpawnedType());
+    }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         if (event.getBlock().getType() != Material.SPAWNER) return;
 
-        Location loc    = event.getBlock().getLocation();
-        Player   player = event.getPlayer();
+        Location loc      = event.getBlock().getLocation();
+        Player   player   = event.getPlayer();
+        String   cacheKey = SpawnerManager.toKey(loc);
 
         event.setDropItems(false);
         event.setExpToDrop(0);
 
-        EntityType type = EntityType.PIG;
-        SpawnerManager.SpawnerData data = manager.getAllSpawners().get(SpawnerManager.toKey(loc));
-        if (data != null) {
-            type = data.type();
-        } else if (loc.getBlock().getState() instanceof CreatureSpawner cs && cs.getSpawnedType() != null) {
-            type = cs.getSpawnedType();
+        SpawnerManager.SpawnerData data = manager.getAllSpawners().get(cacheKey);
+
+        EntityType type = breakTypeCache.remove(cacheKey);
+        if (type == null && data != null) type = data.type();
+        if (type == null) {
+            player.sendMessage("§cErreur : type de spawner non détecté.");
+            return;
         }
 
         int stored   = data != null ? data.count() : 1;
         int toRemove = player.isSneaking() ? stored : 1;
         int newCount = stored - toRemove;
 
-        // Donner les spawners r\u00e9cup\u00e9r\u00e9s
         ItemStack give = makeSpawnerItem(type, toRemove);
         var leftover = player.getInventory().addItem(give);
         leftover.values().forEach(rest ->
                 player.getWorld().dropItemNaturally(player.getLocation(), rest));
 
         if (newCount <= 0) {
-            // Tout r\u00e9cup\u00e9r\u00e9 \u2192 bloc dispara\u00eet normalement
             manager.removeSpawner(loc);
             removeSpawnerHologram(loc);
-            ChatUtil.actionBar(player, "\u00a7e" + formatType(type) + " Spawner \u00a7arecup\u00e9r\u00e9 !");
+            ChatUtil.actionBar(player, "§e" + formatType(type) + " Spawner §arécupéré !");
         } else {
-            // Il reste des spawners \u2192 bloc reste en place
             event.setCancelled(true);
             manager.addSpawner(loc, type, newCount);
             updateSpawnerHologram(loc, type, newCount);
-            ChatUtil.actionBar(player, "\u00a7e" + formatType(type) + " Spawner \u00a77x\u00a76" + newCount
-                    + "  \u00a77(\u00a7c-" + toRemove + " retir\u00e9" + (toRemove > 1 ? "s" : "") + "\u00a77)");
+            ChatUtil.actionBar(player, "§e" + formatType(type) + " Spawner §7x§6" + newCount
+                    + "  §7(§c-" + toRemove + " retiré" + (toRemove > 1 ? "s" : "") + "§7)");
         }
 
         player.updateInventory();
     }
 
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-    //  SPAWN \u2014 x spawners vanilla
-    //  Un spawner x6 spawn 6 mobs \u00e0 chaque cycle
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
+    //  SPAWN EVENT
+    // ════════════════════════════════════════════════
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onSpawnerSpawn(SpawnerSpawnEvent event) {
@@ -298,14 +328,16 @@ public class SpawnerListener implements Listener {
         if (data == null) return;
         if (!(event.getEntity() instanceof Mob firstMob)) return;
 
-        int count = data.count(); // nombre de spawners stack\u00e9s
+        // Marquer persistent IMMÉDIATEMENT (même tick que le spawn)
+        firstMob.setPersistent(true);
+        firstMob.setRemoveWhenFarAway(false);
 
-        // Le premier mob est d\u00e9j\u00e0 spawn\u00e9 par l'event vanilla
-        // On spawn (count - 1) mobs suppl\u00e9mentaires au tick suivant
+        int count = data.count();
+
         if (count <= 1) {
-            // Spawner simple \u2192 juste freeze + stack
             Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(), () -> {
                 if (firstMob.isDead() || !firstMob.isValid()) return;
+                // FIX : findMergeTarget ne cherche QUE des mobs persistent (issus d'un spawner)
                 LivingEntity target = findMergeTarget(firstMob.getLocation(), firstMob.getType(), firstMob);
                 if (target != null) {
                     setStackCount(target, getStackCount(target) + 1);
@@ -320,26 +352,21 @@ public class SpawnerListener implements Listener {
             return;
         }
 
-        // Spawner stack\u00e9 \u2192 spawn count-1 mobs suppl\u00e9mentaires
         Location spawnLoc = event.getSpawner().getLocation().clone().add(0.5, 0.5, 0.5);
         World world       = spawnLoc.getWorld();
 
         Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(), () -> {
-            // Traiter le premier mob
             if (!firstMob.isDead() && firstMob.isValid()) {
                 GlobalSpawnerEngine.applyStackAttributes(firstMob);
                 MobStackListener.addStacked(firstMob.getUniqueId());
             }
 
-            // Spawner les (count - 1) mobs suppl\u00e9mentaires et les merger sur le premier
             LivingEntity master = firstMob.isValid() ? firstMob : null;
 
             for (int i = 1; i < count; i++) {
                 if (master != null) {
-                    // Merger directement dans le master \u2192 pas de nouveau mob physique
                     setStackCount(master, getStackCount(master) + 1);
                 } else {
-                    // Si le 1er est mort, spawner physiquement un nouveau
                     Mob extra = (Mob) world.spawnEntity(spawnLoc, data.type());
                     GlobalSpawnerEngine.applyStackAttributes(extra);
                     MobStackListener.addStacked(extra.getUniqueId());
@@ -355,15 +382,29 @@ public class SpawnerListener implements Listener {
         });
     }
 
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
     //  UTILITAIRES
-    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // ════════════════════════════════════════════════
 
+    /**
+     * Cherche un mob du même type à merger dans un rayon de 5 blocs.
+     *
+     * FIX CRITIQUE : vérification isPersistent() ajoutée.
+     * Sans ça, un mob naturel (zombie/skeleton) qui traîne encore peut être
+     * absorbé par un stack de spawner → le stack hérite d'un mob non-persistent
+     * qui disparaît au déchargement du chunk, corrompant le stack.
+     *
+     * On ne merge QUE des mobs issus d'un spawner (persistent = true).
+     */
     private LivingEntity findMergeTarget(Location center, EntityType type, Entity exclude) {
         for (Entity e : center.getWorld().getNearbyEntities(center, 5, 5, 5)) {
             if (e.getUniqueId().equals(exclude.getUniqueId())) continue;
-            if (e.getType() == type && e instanceof LivingEntity le && !le.isDead())
-                return le;
+            if (e.getType() != type) continue;
+            if (!(e instanceof LivingEntity le)) continue;
+            if (le.isDead()) continue;
+            // FIX : ne merger que des mobs persistent (= issus d'un spawner)
+            if (!le.isPersistent()) continue;
+            return le;
         }
         return null;
     }

@@ -20,7 +20,7 @@ public class IslandGUIListener implements Listener {
 
     private final IslandManager manager = SkyBlockPlugin.getInstance().getIslandManager();
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (event.getCurrentItem() == null) return;

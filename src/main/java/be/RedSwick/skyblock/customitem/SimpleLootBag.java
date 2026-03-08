@@ -1,6 +1,7 @@
 package be.RedSwick.skyblock.customitem;
 
 import be.RedSwick.skyblock.SkyBlockPlugin;
+import be.RedSwick.skyblock.util.ChatUtil;
 import org.bukkit.*;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -245,7 +246,7 @@ public class SimpleLootBag {
                 event.setCancelled(true);
 
                 long total = Storage.getStockCount(bagId, mat);
-                p.sendActionBar("§6+" + dropping.getAmount() + " §f" + fmtMat(mat)
+                ChatUtil.actionBar(p, "§6+" + dropping.getAmount() + " §f" + fmtMat(mat)
                         + " §8(§6" + fmtNum(total) + "§8) §7→ §6Sac de Butin");
                 return;
             }

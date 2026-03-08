@@ -30,6 +30,8 @@ public class GuiProtectionListener implements Listener {
         ARCANIUM_TITLES.add(IslandBlockGUI.TITLE);
         ARCANIUM_TITLES.add(PermissionsGUI.TITLE);
         ARCANIUM_TITLES.add(MissionGUI.TITLE_CATEGORIES);
+        ARCANIUM_TITLES.add(be.RedSwick.skyblock.gui.IslandSettingsGUI.getTitle());
+        ARCANIUM_TITLES.add(be.RedSwick.skyblock.gui.IslandUpgradeGUI.getTitle());
 
         for (PlayerJob job : PlayerJob.values()) {
             ARCANIUM_TITLES.add(JobGUI.getDetailTitle(job));

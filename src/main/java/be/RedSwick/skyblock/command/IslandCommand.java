@@ -109,10 +109,15 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
         Island   newIsland = manager.createIsland(player.getUniqueId(), center);
 
         int cx = center.getBlockX(), cy = center.getBlockY(), cz = center.getBlockZ();
-        world.getBlockAt(cx, cy - 1, cz).setType(Material.BEDROCK);
-        world.getBlockAt(cx, cy,     cz).setType(Material.GRASS_BLOCK);
 
-        Location spawnLoc = new Location(world, cx + 0.5, cy + 1, cz + 0.5, player.getLocation().getYaw(), 0);
+        // Colle le schéma via WorldEdit si disponible, sinon fallback bedrock+grass
+        boolean pasted = SkyBlockPlugin.getInstance().getSchematicManager().pasteAt(center);
+        if (!pasted) {
+            world.getBlockAt(cx, cy - 1, cz).setType(Material.BEDROCK);
+            world.getBlockAt(cx, cy,     cz).setType(Material.GRASS_BLOCK);
+        }
+
+        Location spawnLoc = findSafeSpawn(center);
         player.teleport(spawnLoc);
         applyBorder(player, newIsland);
         player.sendMessage("§a§lÎle créée ! Bienvenue sur Arcanium ✨");
@@ -966,29 +971,63 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (!(sender instanceof Player)) return null;
+
+        // ── args[0] : sous-commande ─────────────────────────────────────
         if (args.length == 1) {
             String input = args[0].toLowerCase();
-            return SUB_COMMANDS.stream().filter(s -> s.startsWith(input)).toList();
+            return SUB_COMMANDS.stream()
+                    .filter(s -> s.startsWith(input))
+                    .sorted()
+                    .toList();
         }
+
+        // ── args[1] ──────────────────────────────────────────────────────
         if (args.length == 2) {
             String sub = args[0].toLowerCase();
             String in  = args[1].toLowerCase();
+
+            // Commandes nécessitant un nom de joueur
             if (List.of("invite","kick","ban","unban","promote","demote",
-                    "join","coop","uncoop","expel","transfer","visit").contains(sub)) {
-                return Bukkit.getOnlinePlayers().stream().map(Player::getName)
-                        .filter(n -> n.toLowerCase().startsWith(in)).toList();
+                    "join","coop","uncoop","expel","transfer","visit","info","team").contains(sub)) {
+                return onlinePlayers(in);
             }
+            // /is warp create | <joueur>
             if (sub.equals("warp")) {
                 List<String> opts = new ArrayList<>();
-                opts.add("create");
-                Bukkit.getOnlinePlayers().stream().map(Player::getName)
-                        .filter(n -> n.toLowerCase().startsWith(in)).forEach(opts::add);
+                if ("create".startsWith(in)) opts.add("create");
+                onlinePlayers(in).forEach(opts::add);
                 return opts;
             }
-            if (sub.equals("name")) return List.of("reset");
-            if (sub.equals("info")) return Bukkit.getOnlinePlayers().stream().map(Player::getName)
-                    .filter(n -> n.toLowerCase().startsWith(in)).toList();
+            // /is name reset | <nom>
+            if (sub.equals("name")) {
+                return "reset".startsWith(in) ? List.of("reset") : List.of();
+            }
+            // /is home <nom>  (les homes perso ne sont pas stockés, on propose les îles par nom)
+            if (sub.equals("home")) return List.of();
+
+            // /is teamchat / tc → texte libre, pas de suggestions
+            if (sub.equals("teamchat") || sub.equals("tc")) return List.of();
         }
-        return null;
+
+        // ── args[2] ──────────────────────────────────────────────────────
+        if (args.length == 3) {
+            String sub = args[0].toLowerCase();
+            // /is team add|remove|list <joueur>
+            if (sub.equals("team")) {
+                String action = args[1].toLowerCase();
+                String in     = args[2].toLowerCase();
+                if (action.equals("add") || action.equals("remove")) return onlinePlayers(in);
+            }
+        }
+
+        return List.of();
+    }
+
+    private List<String> onlinePlayers(String prefix) {
+        return Bukkit.getOnlinePlayers().stream()
+                .map(Player::getName)
+                .filter(n -> n.toLowerCase().startsWith(prefix))
+                .sorted()
+                .toList();
     }
 }
