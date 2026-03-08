@@ -1,6 +1,8 @@
 package be.RedSwick.skyblock.manager;
 
 import be.RedSwick.skyblock.SkyBlockPlugin;
+import be.RedSwick.skyblock.listener.MobStackListener;
+import be.RedSwick.skyblock.listener.SpawnerListener;
 import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -20,7 +22,6 @@ public class MobClearManager {
     }
 
     private void scheduleClear() {
-        // Warning broadcast global — Bukkit.broadcastMessage = 1 seul appel, pas de scan joueurs
         Bukkit.broadcastMessage("§c[ClearLag] §fLes mobs et items au sol seront supprimés dans §e30 secondes§f.");
 
         Bukkit.getScheduler().runTaskLater(SkyBlockPlugin.getInstance(), () -> {
@@ -31,8 +32,17 @@ public class MobClearManager {
                 if (!world.getName().equals("skyblock")) continue;
                 for (Entity entity : world.getEntities()) {
                     if (isProtected(entity)) continue;
-                    if (entity instanceof Mob)  { entity.remove(); mobs++;  }
-                    else if (entity instanceof Item) { entity.remove(); items++; }
+
+                    if (entity instanceof Mob mob) {
+                        // Nettoyer les maps de stack proprement avant de remove
+                        MobStackListener.removeStacked(mob.getUniqueId());
+                        SpawnerListener.removeStackEntry(mob.getUniqueId());
+                        mob.remove();
+                        mobs++;
+                    } else if (entity instanceof Item) {
+                        entity.remove();
+                        items++;
+                    }
                 }
             }
 

@@ -16,6 +16,21 @@ import org.bukkit.event.entity.EntityDeathEvent;
 
 import java.util.UUID;
 
+/**
+ * MissionListener — Optimisé
+ *
+ * CORRECTION CRITIQUE :
+ * L'ancien code appelait saveIsland() à chaque BlockBreakEvent et EntityDeathEvent.
+ * Sur un joueur avec une Houe 5x5, ça fait 25 saveIsland() par clic = 25 I/O YAML.
+ * Avec 50 joueurs actifs = des centaines de writes/seconde.
+ *
+ * SOLUTION :
+ * - On marque l'île dirty uniquement si une progression réelle a eu lieu
+ * - Le flush se fait via IslandManager.saveIsland() (déjà async) mais seulement si dirty
+ * - Pour les événements très fréquents (BlockBreak), on utilise un flag "needsSave"
+ *   qui ne déclenche saveIsland() qu'une fois par événement, et seulement si quelque
+ *   chose a changé.
+ */
 public class MissionListener implements Listener {
 
     private final IslandManager islandManager =
@@ -28,15 +43,18 @@ public class MissionListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
 
-        Player player = event.getPlayer();
-        Block  block  = event.getBlock();
-        Material mat  = block.getType();
+        Player  player = event.getPlayer();
+        Block   block  = event.getBlock();
+        Material mat   = block.getType();
 
         Island island = islandManager.getIslandByMember(player.getUniqueId());
         if (island == null) return;
 
         int amount = getBlockAmount(block);
         if (amount <= 0) return;
+
+        // FIX : flag pour ne sauvegarder que si au moins une mission a progressé
+        boolean missionProgressed = false;
 
         for (IslandMission mission : IslandMission.values()) {
             if (island.isMissionCompleted(mission)) continue;
@@ -48,14 +66,19 @@ public class MissionListener implements Listener {
             if (matches(mat, target)) {
                 boolean wasDone = island.isMissionCompleted(mission);
                 island.addMissionProgress(mission, amount);
+                missionProgressed = true;
                 if (!wasDone && island.isMissionCompleted(mission)) {
                     notifyCompletion(player, island, mission);
                 }
             }
         }
 
-        // ← CORRECTION : saveIsland à la place de markDirty
-        islandManager.saveIsland(island);
+        // OPTIMISATION : saveIsland() uniquement si une mission a réellement progressé
+        // Avant : saveIsland() systématiquement à chaque bloc cassé (= des centaines/s)
+        // Après : uniquement lors d'une progression de mission (= rare)
+        if (missionProgressed) {
+            islandManager.saveIsland(island);
+        }
     }
 
     // ══════════════════════════════════════════════════════
@@ -69,7 +92,6 @@ public class MissionListener implements Listener {
 
         EntityType type = event.getEntityType();
 
-        // Récupère le compteur de stack si présent (MobStackListener)
         int count = event.getEntity().getMetadata("stack_count")
                 .stream().findFirst()
                 .map(v -> v.asInt())
@@ -77,6 +99,8 @@ public class MissionListener implements Listener {
 
         Island island = islandManager.getIslandByMember(player.getUniqueId());
         if (island == null) return;
+
+        boolean missionProgressed = false;
 
         for (IslandMission mission : IslandMission.values()) {
             if (mission.getCategory() != Category.CHASSEUR) continue;
@@ -87,13 +111,15 @@ public class MissionListener implements Listener {
 
             boolean wasDone = island.isMissionCompleted(mission);
             island.addMissionProgress(mission, count);
+            missionProgressed = true;
             if (!wasDone && island.isMissionCompleted(mission)) {
                 notifyCompletion(player, island, mission);
             }
         }
 
-        // ← CORRECTION : saveIsland à la place de markDirty
-        islandManager.saveIsland(island);
+        if (missionProgressed) {
+            islandManager.saveIsland(island);
+        }
     }
 
     // ─────────────────────────────────────────────

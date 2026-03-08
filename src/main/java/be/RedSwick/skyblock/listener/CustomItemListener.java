@@ -19,11 +19,13 @@ import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.*;
 import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class CustomItemListener implements Listener {
 
@@ -35,8 +37,13 @@ public class CustomItemListener implements Listener {
     private static final Map<UUID, Material>  multiSwapCurrent  = new HashMap<>();
     private static final Map<UUID, Material>  multiLastTarget   = new HashMap<>();
 
+    // OPTIMISATION onPlayerMove : cooldown 3 ticks (150ms) entre chaque swap
+    // PlayerMoveEvent se fire à ~20/s par joueur → sans cooldown = 20 getTargetBlock()/s
+    // Avec cooldown 3 ticks → max ~6-7 calculs/s, imperceptible visuellement
+    private static final Map<UUID, Long> swapCooldown = new ConcurrentHashMap<>();
+    private static final long SWAP_COOLDOWN_MS = 150; // 3 ticks
+
     // Anti-farm : set des locations posées par des joueurs
-    // On ne donne pas d'XP si le bloc a été posé par un joueur
     public static final Set<String> playerPlaced = Collections.synchronizedSet(new HashSet<>());
 
     // Blocs valides Hammer
@@ -76,18 +83,16 @@ public class CustomItemListener implements Listener {
     // Fonte : RAW = résultat des mines vanilla + minerais directs
     private static final Map<Material, Material> SMELT_MAP = new HashMap<>();
     static {
-        // Drops vanilla avec Fortune = raw form
-        SMELT_MAP.put(Material.RAW_IRON,            Material.IRON_INGOT);
-        SMELT_MAP.put(Material.RAW_GOLD,            Material.GOLD_INGOT);
-        SMELT_MAP.put(Material.RAW_COPPER,          Material.COPPER_INGOT);
-        // Minerais directs (sans silk touch)
-        SMELT_MAP.put(Material.IRON_ORE,            Material.IRON_INGOT);
-        SMELT_MAP.put(Material.DEEPSLATE_IRON_ORE,  Material.IRON_INGOT);
-        SMELT_MAP.put(Material.GOLD_ORE,            Material.GOLD_INGOT);
-        SMELT_MAP.put(Material.DEEPSLATE_GOLD_ORE,  Material.GOLD_INGOT);
-        SMELT_MAP.put(Material.COPPER_ORE,          Material.COPPER_INGOT);
-        SMELT_MAP.put(Material.DEEPSLATE_COPPER_ORE,Material.COPPER_INGOT);
-        SMELT_MAP.put(Material.ANCIENT_DEBRIS,      Material.NETHERITE_SCRAP);
+        SMELT_MAP.put(Material.RAW_IRON,             Material.IRON_INGOT);
+        SMELT_MAP.put(Material.RAW_GOLD,             Material.GOLD_INGOT);
+        SMELT_MAP.put(Material.RAW_COPPER,           Material.COPPER_INGOT);
+        SMELT_MAP.put(Material.IRON_ORE,             Material.IRON_INGOT);
+        SMELT_MAP.put(Material.DEEPSLATE_IRON_ORE,   Material.IRON_INGOT);
+        SMELT_MAP.put(Material.GOLD_ORE,             Material.GOLD_INGOT);
+        SMELT_MAP.put(Material.DEEPSLATE_GOLD_ORE,   Material.GOLD_INGOT);
+        SMELT_MAP.put(Material.COPPER_ORE,           Material.COPPER_INGOT);
+        SMELT_MAP.put(Material.DEEPSLATE_COPPER_ORE, Material.COPPER_INGOT);
+        SMELT_MAP.put(Material.ANCIENT_DEBRIS,       Material.NETHERITE_SCRAP);
     }
 
     // ════════════════════════════════════════════════
@@ -129,21 +134,18 @@ public class CustomItemListener implements Listener {
                         () -> p.openInventory(CustomToolGUI.createMultitool(p)));
                 return;
             }
-            // Filet de pêche
             if (type == CustomItemType.FISHING_NET) {
                 event.setCancelled(true);
                 Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
                         () -> p.openInventory(CustomToolGUI.createFishingNet(p)));
                 return;
             }
-            // Épées réparables
             if (type.isSword() && type.isRepairable()) {
                 event.setCancelled(true);
                 Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
                         () -> p.openInventory(CustomToolGUI.createSword(p, type)));
                 return;
             }
-            // Fallback : tout item réparable sans GUI spécifique
             if (type.isRepairable()) {
                 event.setCancelled(true);
                 Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
@@ -151,8 +153,6 @@ public class CustomItemListener implements Listener {
                 return;
             }
         }
-
-        // La réparation se fait dans le GUI (Shift+Clic droit)
 
         // Bâton de vente → clic droit sur coffre
         if (type.isSellWand() && action == Action.RIGHT_CLICK_BLOCK) {
@@ -184,14 +184,12 @@ public class CustomItemListener implements Listener {
         ItemStack hand = p.getInventory().getItemInMainHand();
         CustomItemType type = CustomItemManager.getType(hand);
 
-        // Si l'item en main n'est pas reconnu, vérifier si c'est un outil swappé par le multitool
         if (type == null) {
             UUID uuid = p.getUniqueId();
             ItemStack original = multiSwapOriginal.get(uuid);
             if (original != null) {
                 CustomItemType origType = CustomItemManager.getType(original);
                 if (origType != null && origType.isMultitool()) {
-                    // On est en mode swap — traiter comme un multitool
                     handleMultitool(event, p, original, origType, event.getBlock());
                 }
             }
@@ -266,13 +264,13 @@ public class CustomItemListener implements Listener {
     public void onConfigClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player p)) return;
         String title = event.getView().getTitle();
-        boolean isHammer = title.equals(CustomToolGUI.TITLE_HAMMER);
-        boolean isAxe    = title.equals(CustomToolGUI.TITLE_AXE);
-        boolean isMulti  = title.equals(CustomToolGUI.TITLE_MULTITOOL);
-        boolean isHoe      = title.equals(CustomToolGUI.TITLE_HOE) || title.equals(CustomToolGUI.TITLE_HOE_5X5);
-        boolean isFishNet  = title.equals(CustomToolGUI.TITLE_FISHING_NET);
-        boolean isSword    = title.startsWith(CustomToolGUI.TITLE_SWORD_PREFIX);
-        boolean isRepair   = title.startsWith(CustomToolGUI.TITLE_REPAIR_PREFIX);
+        boolean isHammer  = title.equals(CustomToolGUI.TITLE_HAMMER);
+        boolean isAxe     = title.equals(CustomToolGUI.TITLE_AXE);
+        boolean isMulti   = title.equals(CustomToolGUI.TITLE_MULTITOOL);
+        boolean isHoe     = title.equals(CustomToolGUI.TITLE_HOE) || title.equals(CustomToolGUI.TITLE_HOE_5X5);
+        boolean isFishNet = title.equals(CustomToolGUI.TITLE_FISHING_NET);
+        boolean isSword   = title.startsWith(CustomToolGUI.TITLE_SWORD_PREFIX);
+        boolean isRepair  = title.startsWith(CustomToolGUI.TITLE_REPAIR_PREFIX);
         if (!isHammer && !isAxe && !isHoe && !isMulti && !isFishNet && !isSword && !isRepair) return;
 
         event.setCancelled(true);
@@ -290,16 +288,15 @@ public class CustomItemListener implements Listener {
             if ("repair".equals(actionId)) {
                 if (t2 != null && t2.isRepairable()) tryRepair(p, hand2, t2);
             } else if ("sword_autosell".equals(actionId)) {
-                be.RedSwick.skyblock.customitem.SwordConfig.ArcaniumConfig cfg =
-                        be.RedSwick.skyblock.customitem.SwordConfig.get().getArcanium(p.getUniqueId());
-                be.RedSwick.skyblock.customitem.SwordConfig.get().setArcanium(
+                SwordConfig.ArcaniumConfig cfg =
+                        SwordConfig.get().getArcanium(p.getUniqueId());
+                SwordConfig.get().setArcanium(
                         p.getUniqueId(),
-                        new be.RedSwick.skyblock.customitem.SwordConfig.ArcaniumConfig(!cfg.autoSell()));
+                        new SwordConfig.ArcaniumConfig(!cfg.autoSell()));
             } else if (clicked.getType() == Material.BARRIER) {
                 p.closeInventory();
                 return;
             }
-            // Re-ouvrir le bon GUI
             final CustomItemType finalT2 = t2;
             if (isFishNet)
                 Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
@@ -313,11 +310,11 @@ public class CustomItemListener implements Listener {
             return;
         }
         if (isMulti) {
-            CustomItemConfig.MultitoolConfig cfg = CustomItemConfig.get().getMultitool(p.getUniqueId());
-            CustomItemConfig.MultitoolConfig newCfg = switch (actionId) {
-                case "mt_autosell" -> new CustomItemConfig.MultitoolConfig(!cfg.autoSell(), cfg.smelt(), cfg.silkTouch());
-                case "mt_smelt"    -> new CustomItemConfig.MultitoolConfig(cfg.autoSell(), !cfg.smelt(), cfg.silkTouch() && cfg.smelt());
-                case "mt_silk"     -> new CustomItemConfig.MultitoolConfig(cfg.autoSell(), cfg.smelt() && !cfg.silkTouch(), !cfg.silkTouch());
+            MultitoolConfig cfg = CustomItemConfig.get().getMultitool(p.getUniqueId());
+            MultitoolConfig newCfg = switch (actionId) {
+                case "mt_autosell" -> new MultitoolConfig(!cfg.autoSell(), cfg.smelt(), cfg.silkTouch());
+                case "mt_smelt"    -> new MultitoolConfig(cfg.autoSell(), !cfg.smelt(), cfg.silkTouch() && cfg.smelt());
+                case "mt_silk"     -> new MultitoolConfig(cfg.autoSell(), cfg.smelt() && !cfg.silkTouch(), !cfg.silkTouch());
                 default -> cfg;
             };
             CustomItemConfig.get().setMultitool(p.getUniqueId(), newCfg);
@@ -326,20 +323,22 @@ public class CustomItemListener implements Listener {
                 CustomItemType t2 = CustomItemManager.getType(hand2);
                 if (t2 != null && t2.isRepairable()) tryRepair(p, hand2, t2);
             }
-            Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(), () -> p.openInventory(CustomToolGUI.createMultitool(p)));
+            Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
+                    () -> p.openInventory(CustomToolGUI.createMultitool(p)));
             return;
         }
         if (isAxe) {
-            CustomItemConfig.AxeConfig cfg = CustomItemConfig.get().getAxe(p.getUniqueId());
+            AxeConfig cfg = CustomItemConfig.get().getAxe(p.getUniqueId());
             if ("axe_autosell".equals(actionId)) {
-                CustomItemConfig.get().setAxe(p.getUniqueId(), new CustomItemConfig.AxeConfig(!cfg.autoSell()));
+                CustomItemConfig.get().setAxe(p.getUniqueId(), new AxeConfig(!cfg.autoSell()));
             }
             if ("repair".equals(actionId)) {
                 ItemStack hand2 = p.getInventory().getItemInMainHand();
                 CustomItemType t2 = CustomItemManager.getType(hand2);
                 if (t2 != null && t2.isRepairable()) tryRepair(p, hand2, t2);
             }
-            Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(), () -> p.openInventory(CustomToolGUI.createAxe(p)));
+            Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
+                    () -> p.openInventory(CustomToolGUI.createAxe(p)));
             return;
         }
         if (isHammer) {
@@ -356,7 +355,8 @@ public class CustomItemListener implements Listener {
                 default -> cfg;
             };
             CustomItemConfig.get().setHammer(p.getUniqueId(), newCfg);
-            Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(), () -> p.openInventory(CustomToolGUI.createHammer(p)));
+            Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
+                    () -> p.openInventory(CustomToolGUI.createHammer(p)));
         } else {
             HoeConfig cfg = CustomItemConfig.get().getHoe(p.getUniqueId());
             HoeConfig newCfg = switch (actionId) {
@@ -366,7 +366,8 @@ public class CustomItemListener implements Listener {
                 default -> cfg;
             };
             CustomItemConfig.get().setHoe(p.getUniqueId(), newCfg);
-            Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(), () -> p.openInventory(CustomToolGUI.createHoe5x5(p)));
+            Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
+                    () -> p.openInventory(CustomToolGUI.createHoe5x5(p)));
         }
     }
 
@@ -383,6 +384,25 @@ public class CustomItemListener implements Listener {
     }
 
     // ════════════════════════════════════════════════
+    //  NETTOYAGE AU QUIT — évite les fuites mémoire
+    //  FIX : les maps UUID→ItemStack/Material/Long ne sont jamais nettoyées
+    //        si le joueur se déconnecte sans changer d'item ou sans se déplacer.
+    //        Sur un serveur long-running = fuite mémoire progressive.
+    // ════════════════════════════════════════════════
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        // Remettre le multitool avant de nettoyer (cohérence inventaire sauvegardé)
+        restoreMultitool(event.getPlayer());
+        // Nettoyage complet des maps
+        multiSwapOriginal.remove(uuid);
+        multiSwapCurrent.remove(uuid);
+        multiLastTarget.remove(uuid);
+        swapCooldown.remove(uuid);
+    }
+
+    // ════════════════════════════════════════════════
     //  LOGIQUE HAMMER
     // ════════════════════════════════════════════════
 
@@ -396,8 +416,6 @@ public class CustomItemListener implements Listener {
         int broken = 0;
         long sellTotal = 0;
 
-        // OPTIMISATION : accumuler XP/coins pour les 9 blocs du 3x3
-        // puis rewardActionBatch() UNE SEULE FOIS — au lieu de 9 appels rewardAction()
         double batchXp    = 0;
         double batchCoins = 0;
 
@@ -411,10 +429,9 @@ public class CustomItemListener implements Listener {
                 b.setType(Material.AIR);
                 broken++;
 
-                // Accumuler XP miner — anti-farm via playerPlaced
                 String locK = locKey(b.getLocation());
                 if (!playerPlaced.remove(locK)) {
-                    var minerAction = be.RedSwick.skyblock.job.JobXpTable.MINER_BLOCKS.get(blockMat);
+                    var minerAction = JobXpTable.MINER_BLOCKS.get(blockMat);
                     if (minerAction != null) {
                         batchXp    += minerAction.xp();
                         batchCoins += minerAction.coins();
@@ -423,7 +440,6 @@ public class CustomItemListener implements Listener {
 
                 for (ItemStack drop : drops) {
                     ItemStack finalDrop = applySmelt(drop, cfg.smelt());
-
                     boolean sold = false;
                     if (cfg.autoSell() && !cfg.smelt()) {
                         long earned = SellWandHelper.sellStack(p, finalDrop, 1.0);
@@ -432,20 +448,51 @@ public class CustomItemListener implements Listener {
                         long earned = SellWandHelper.sellStack(p, finalDrop, 1.0);
                         if (earned > 0) { sellTotal += earned; sold = true; }
                     }
-
                     if (!sold) giveOrDrop(p, finalDrop);
                 }
             }
         }
 
-        // 1 seul appel pour les 9 blocs
         if (batchXp > 0 || batchCoins > 0)
             SkyBlockPlugin.getInstance().getJobManager()
-                    .rewardActionBatch(p, be.RedSwick.skyblock.player.PlayerJob.MINER, batchXp, batchCoins);
+                    .rewardActionBatch(p, PlayerJob.MINER, batchXp, batchCoins);
 
-        if (sellTotal > 0)
-            sendSellActionBar(p, sellTotal);
+        if (sellTotal > 0) sendSellActionBar(p, sellTotal);
+        applyDurability(p, hand, type, broken);
+    }
 
+    // ════════════════════════════════════════════════
+    //  LOGIQUE AXE
+    // ════════════════════════════════════════════════
+
+    private void handleAxe(BlockBreakEvent event, Player p, ItemStack hand,
+                           CustomItemType type, Block center) {
+        AxeConfig cfg = CustomItemConfig.get().getAxe(p.getUniqueId());
+        event.setDropItems(false);
+        BlockFace face = getTargetFace(p);
+        int radius = 1;
+        int broken = 0;
+        long sellTotal = 0;
+
+        for (int a = -radius; a <= radius; a++) {
+            for (int b2 = -radius; b2 <= radius; b2++) {
+                Block b = getRelativeOnFace(center, face, a, b2);
+                Material blockMat = b.getType();
+                if (!AXE_BLOCKS.contains(blockMat)) continue;
+                Collection<ItemStack> drops = b.getDrops(hand);
+                b.setType(Material.AIR);
+                broken++;
+                triggerBucheronJob(p, blockMat, b.getLocation());
+                for (ItemStack drop : drops) {
+                    if (cfg.autoSell()) {
+                        long earned = SellWandHelper.sellStack(p, drop, 1.0);
+                        if (earned > 0) { sellTotal += earned; continue; }
+                    }
+                    giveOrDrop(p, drop);
+                }
+            }
+        }
+        if (sellTotal > 0) sendSellActionBar(p, sellTotal);
         applyDurability(p, hand, type, broken);
     }
 
@@ -453,14 +500,12 @@ public class CustomItemListener implements Listener {
     //  LOGIQUE MULTITOOL
     // ════════════════════════════════════════════════
 
-    // Blocs qui nécessitent une pelle
     private static final Set<Material> SHOVEL_BLOCKS = Set.of(
             Material.DIRT, Material.GRASS_BLOCK, Material.GRAVEL, Material.SAND,
             Material.RED_SAND, Material.COARSE_DIRT, Material.PODZOL, Material.MYCELIUM,
             Material.SOUL_SAND, Material.SOUL_SOIL, Material.CLAY, Material.SNOW,
             Material.SNOW_BLOCK, Material.POWDER_SNOW, Material.MUD
     );
-    // Blocs qui nécessitent une hache
     private static final Set<Material> AXE_BREAK_BLOCKS = Set.of(
             Material.OAK_LOG, Material.BIRCH_LOG, Material.SPRUCE_LOG, Material.JUNGLE_LOG,
             Material.ACACIA_LOG, Material.DARK_OAK_LOG, Material.MANGROVE_LOG, Material.CHERRY_LOG,
@@ -473,16 +518,13 @@ public class CustomItemListener implements Listener {
 
     private void handleMultitool(BlockBreakEvent event, Player p, ItemStack hand,
                                  CustomItemType type, Block center) {
-        CustomItemConfig.MultitoolConfig cfg = type == CustomItemType.MULTITOOL_ELITE
+        MultitoolConfig cfg = type == CustomItemType.MULTITOOL_ELITE
                 ? CustomItemConfig.get().getMultitool(p.getUniqueId())
-                : new CustomItemConfig.MultitoolConfig(false, false, false);
+                : new MultitoolConfig(false, false, false);
 
         Material blockMat = center.getType();
-
-        // Cancel les drops vanilla, on les recalcule avec le bon outil
         event.setDropItems(false);
 
-        // "hand" est toujours le multitool original (passé depuis onBlockBreak)
         ItemStack effectiveTool = getEffectiveTool(blockMat, hand);
         Collection<ItemStack> drops;
 
@@ -503,9 +545,7 @@ public class CustomItemListener implements Listener {
         }
         if (sellTotal > 0) sendSellActionBar(p, sellTotal);
 
-        // XP miner uniquement sur les blocs de type pioche (pas pelle/hache)
         if (!SHOVEL_BLOCKS.contains(blockMat) && !AXE_BREAK_BLOCKS.contains(blockMat)) {
-            // Anti-farm : pas d'XP si le joueur a posé ce bloc lui-même
             String locKey = locKey(center.getLocation());
             if (!playerPlaced.remove(locKey)) {
                 triggerMinerJob(p, blockMat, center.getLocation());
@@ -516,7 +556,6 @@ public class CustomItemListener implements Listener {
         multiLastTarget.remove(uuid);
         ItemStack multitoolItem = hand;
 
-        // Durabilité sur le multitool original
         int unbreaking = multitoolItem.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.UNBREAKING);
         boolean consume = (unbreaking == 0 || RANDOM.nextInt(unbreaking + 1) == 0);
 
@@ -524,7 +563,7 @@ public class CustomItemListener implements Listener {
 
         if (!consume) {
             multiSwapOriginal.put(uuid, finalMultitool);
-            multiSwapCurrent.remove(uuid); // forcer re-swap au prochain move
+            multiSwapCurrent.remove(uuid);
             Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
                     () -> performSwap(p, uuid, finalMultitool));
             return;
@@ -548,7 +587,7 @@ public class CustomItemListener implements Listener {
             ItemStack updated = CustomItemManager.useDurability(multitoolItem, 1);
             if (updated != null) {
                 multiSwapOriginal.put(uuid, updated);
-                multiSwapCurrent.remove(uuid); // forcer re-swap immédiat
+                multiSwapCurrent.remove(uuid);
                 Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
                         () -> performSwap(p, uuid, updated));
                 int newDur = CustomItemManager.getDurability(updated);
@@ -560,37 +599,48 @@ public class CustomItemListener implements Listener {
     }
 
     // ════════════════════════════════════════════════
-    //  MULTITOOL SWAP — PlayerMoveEvent (rotation tête uniquement)
-    //  Optimisé : swap seulement si le type de bloc visé change
+    //  MULTITOOL SWAP — PlayerMoveEvent OPTIMISÉ
+    //
+    //  PROBLÈME ORIGINAL :
+    //  PlayerMoveEvent se fire ~20x/s par joueur (chaque micro-mouvement).
+    //  getTargetBlock() est relativement coûteux (raycasting).
+    //  Sur 50 joueurs avec multitool = 1000 raycasts/s.
+    //
+    //  SOLUTION :
+    //  - Cooldown 150ms (3 ticks) entre chaque calcul de swap
+    //  - Même comportement visuel, 3-4x moins de calculs
     // ════════════════════════════════════════════════
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerMove(org.bukkit.event.player.PlayerMoveEvent event) {
+    public void onPlayerMove(PlayerMoveEvent event) {
         org.bukkit.Location from = event.getFrom();
         org.bukkit.Location to   = event.getTo();
         if (to == null) return;
-        // Ignorer si la tête n'a pas bougé
+        // Ignorer si la tête n'a pas bougé (déplacement latéral sans rotation)
         if (from.getPitch() == to.getPitch() && from.getYaw() == to.getYaw()) return;
 
         Player p = event.getPlayer();
         UUID uuid = p.getUniqueId();
 
-        // Cas 1 : joueur a un multitool en main
+        // OPTIMISATION : cooldown 150ms (3 ticks) entre chaque swap
+        long now = System.currentTimeMillis();
+        Long lastSwap = swapCooldown.get(uuid);
+        if (lastSwap != null && now - lastSwap < SWAP_COOLDOWN_MS) return;
+
         ItemStack hand = p.getInventory().getItemInMainHand();
         CustomItemType type = CustomItemManager.getType(hand);
         if (type != null && type.isMultitool()) {
-            multiSwapOriginal.put(uuid, hand.clone()); // toujours mettre à jour l'original
+            swapCooldown.put(uuid, now);
+            multiSwapOriginal.put(uuid, hand.clone());
             performSwap(p, uuid, hand);
             return;
         }
 
-        // Cas 2 : joueur a un outil swappé en main (original sauvegardé)
         if (multiSwapOriginal.containsKey(uuid)) {
-            // On est en mode swap — vérifier le bloc visé et re-swapper si besoin
+            swapCooldown.put(uuid, now);
             ItemStack original = multiSwapOriginal.get(uuid);
             performSwap(p, uuid, original);
         }
-        // Cas 3 : ni multitool ni swappé → rien à faire
     }
 
     private void performSwap(Player p, UUID uuid, ItemStack multitoolItem) {
@@ -599,10 +649,7 @@ public class CustomItemListener implements Listener {
         Material blockMat = (target == null || target.getType().isAir())
                 ? null : target.getType();
 
-        // Déterminer l'outil nécessaire
-        // null = vise le vide → garder le multitool en main tel quel (pioche de base)
         if (blockMat == null) {
-            // Remettre le multitool original si on avait swappé
             Material cur = multiSwapCurrent.get(uuid);
             if (cur != null) {
                 multiSwapCurrent.remove(uuid);
@@ -613,26 +660,23 @@ public class CustomItemListener implements Listener {
 
         Material needed = getNeededToolMaterial(blockMat);
 
-        // Si c'est une pioche → garder le multitool original (il EST une pioche)
         if (needed == Material.DIAMOND_PICKAXE) {
             Material cur = multiSwapCurrent.get(uuid);
             if (cur != null && cur != Material.DIAMOND_PICKAXE) {
-                // On était sur pelle/hache → remettre le multitool
                 multiSwapCurrent.remove(uuid);
                 p.getInventory().setItemInMainHand(multiSwapOriginal.get(uuid).clone());
             }
             return;
         }
 
-        // Pelle ou hache nécessaire
-        if (needed == multiSwapCurrent.get(uuid)) return; // déjà le bon outil
+        if (needed == multiSwapCurrent.get(uuid)) return;
 
         multiSwapCurrent.put(uuid, needed);
         p.getInventory().setItemInMainHand(getEffectiveTool(blockMat, multitoolItem));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onHeldItemChange(org.bukkit.event.player.PlayerItemHeldEvent event) {
+    public void onHeldItemChange(PlayerItemHeldEvent event) {
         restoreMultitool(event.getPlayer());
     }
 
@@ -641,8 +685,8 @@ public class CustomItemListener implements Listener {
         ItemStack original = multiSwapOriginal.remove(uuid);
         multiSwapCurrent.remove(uuid);
         multiLastTarget.remove(uuid);
+        swapCooldown.remove(uuid);
         if (original != null) {
-            // Remettre seulement si l'item actuel n'est pas déjà le multitool
             CustomItemType cur = CustomItemManager.getType(p.getInventory().getItemInMainHand());
             if (cur == null) {
                 p.getInventory().setItemInMainHand(original);
@@ -653,11 +697,9 @@ public class CustomItemListener implements Listener {
     private Material getNeededToolMaterial(Material blockMat) {
         if (SHOVEL_BLOCKS.contains(blockMat)) return Material.DIAMOND_SHOVEL;
         if (AXE_BREAK_BLOCKS.contains(blockMat)) return Material.DIAMOND_AXE;
-        return Material.DIAMOND_PICKAXE; // pioche = pas de swap, garder le multitool
+        return Material.DIAMOND_PICKAXE;
     }
 
-    /** Retourne un ItemStack avec le bon matériau pour les drops selon le bloc.
-     *  Conserve le nom d'affichage et le lore du multitool original. */
     private ItemStack getEffectiveTool(Material blockMat, ItemStack originalHand) {
         Material toolMat;
         if (SHOVEL_BLOCKS.contains(blockMat)) {
@@ -669,16 +711,15 @@ public class CustomItemListener implements Listener {
         }
 
         ItemStack tool = new ItemStack(toolMat);
-        org.bukkit.inventory.meta.ItemMeta newMeta = tool.getItemMeta();
+        org.bukkit.inventory.meta.ItemMeta newMeta  = tool.getItemMeta();
         org.bukkit.inventory.meta.ItemMeta origMeta = originalHand.getItemMeta();
 
-        // Copier nom, lore et enchants du multitool
         if (origMeta != null && newMeta != null) {
             if (origMeta.hasDisplayName())
                 newMeta.setDisplayName(origMeta.getDisplayName());
             if (origMeta.hasLore())
                 newMeta.setLore(origMeta.getLore());
-            newMeta.setUnbreakable(true); // dura gérée par notre système
+            newMeta.setUnbreakable(true);
             originalHand.getEnchantments().forEach((ench, lvl) -> newMeta.addEnchant(ench, lvl, true));
             tool.setItemMeta(newMeta);
         }
@@ -691,7 +732,6 @@ public class CustomItemListener implements Listener {
 
     private void handleHoe(BlockBreakEvent event, Player p, ItemStack hand,
                            CustomItemType type, Block center) {
-        // Config perso seulement pour la 5x5 (auto-sell)
         HoeConfig cfg = type == CustomItemType.FARMERS_HOE_5X5
                 ? CustomItemConfig.get().getHoe(p.getUniqueId())
                 : new HoeConfig(true, false, type.getRadius());
@@ -701,10 +741,6 @@ public class CustomItemListener implements Listener {
         int broken = 0;
         long sellTotal = 0;
 
-        // OPTIMISATION CRITIQUE : accumuler XP/coins pour toute la passe 5x5
-        // puis appeler rewardActionBatch() UNE SEULE FOIS à la fin.
-        // Avant : triggerFarmerJob() par drop → 50-75 appels rewardAction() par clic
-        // Après : 1 seul checkLevelUp + 1 seul sendActionBar pour toute la passe.
         double batchXp    = 0;
         double batchCoins = 0;
 
@@ -716,7 +752,7 @@ public class CustomItemListener implements Listener {
                         && ageable.getAge() < ageable.getMaximumAge()) continue;
 
                 Material cropType = b.getType();
-                Collection<ItemStack> drops = b.getDrops(hand);
+                Collection<ItemStack> drops       = b.getDrops(hand);
                 Collection<ItemStack> dropsNoTool = b.getDrops();
                 broken++;
 
@@ -741,8 +777,7 @@ public class CustomItemListener implements Listener {
                         finalDrops.add(applyFortune(d, cropType, fortuneLevel));
                 }
 
-                // Accumuler l'XP du type de bloc (pas du drop) — clé correcte dans FARMER_CROPS
-                var cropAction = be.RedSwick.skyblock.job.JobXpTable.FARMER_CROPS.get(cropType);
+                var cropAction = JobXpTable.FARMER_CROPS.get(cropType);
                 if (cropAction != null) {
                     batchXp    += cropAction.xp();
                     batchCoins += cropAction.coins();
@@ -766,52 +801,17 @@ public class CustomItemListener implements Listener {
             }
         }
 
-        // 1 seul appel rewardActionBatch pour toute la passe — au lieu de 50-75
         if (batchXp > 0 || batchCoins > 0)
             SkyBlockPlugin.getInstance().getJobManager()
-                    .rewardActionBatch(p, be.RedSwick.skyblock.player.PlayerJob.FARMER, batchXp, batchCoins);
+                    .rewardActionBatch(p, PlayerJob.FARMER, batchXp, batchCoins);
 
-        if (sellTotal > 0)
-            sendSellActionBar(p, sellTotal);
+        if (sellTotal > 0) sendSellActionBar(p, sellTotal);
 
-        // Stat cultures récoltées
         if (broken > 0) {
             var pData = SkyBlockPlugin.getInstance().getPlayerDataManager().get(p.getUniqueId());
             if (pData != null) pData.addCropsBroken(broken);
         }
 
-        applyDurability(p, hand, type, broken);
-    }
-
-    private void handleAxe(BlockBreakEvent event, Player p, ItemStack hand,
-                           CustomItemType type, Block center) {
-        CustomItemConfig.AxeConfig cfg = CustomItemConfig.get().getAxe(p.getUniqueId());
-        event.setDropItems(false);
-        BlockFace face = getTargetFace(p);
-        int radius = 1;
-        int broken = 0;
-        long sellTotal = 0;
-
-        for (int a = -radius; a <= radius; a++) {
-            for (int b2 = -radius; b2 <= radius; b2++) {
-                Block b = getRelativeOnFace(center, face, a, b2);
-                Material blockMat = b.getType();
-                if (!AXE_BLOCKS.contains(blockMat)) continue;
-                Collection<ItemStack> drops = b.getDrops(hand);
-                b.setType(Material.AIR);
-                broken++;
-                // XP bucheron
-                triggerBucheronJob(p, blockMat, b.getLocation());
-                for (ItemStack drop : drops) {
-                    if (cfg.autoSell()) {
-                        long earned = SellWandHelper.sellStack(p, drop, 1.0);
-                        if (earned > 0) { sellTotal += earned; continue; }
-                    }
-                    giveOrDrop(p, drop);
-                }
-            }
-        }
-        if (sellTotal > 0) sendSellActionBar(p, sellTotal);
         applyDurability(p, hand, type, broken);
     }
 
@@ -870,16 +870,9 @@ public class CustomItemListener implements Listener {
     //  HELPERS
     // ════════════════════════════════════════════════
 
-    /**
-     * Applique la fortune sur un drop de culture.
-     * Vanilla : blé/betterave = 1 récolte de base + fortune bonus
-     * Carotte/Patate = 1-4 de base, fortune augmente le max
-     */
     private ItemStack applyFortune(ItemStack drop, Material cropType, int fortuneLevel) {
         if (fortuneLevel == 0) return drop.clone();
         int base = drop.getAmount();
-        // Multiplicateur fortune : entre 1 et (fortuneLevel + 1)
-        // Fortune 5 → multiplicateur entre 1 et 6
         int multiplier = 1 + RANDOM.nextInt(fortuneLevel + 1);
         int result = Math.min(base * multiplier, 64);
         ItemStack out = drop.clone();
@@ -887,10 +880,6 @@ public class CustomItemListener implements Listener {
         return out;
     }
 
-    /**
-     * Applique la fonte automatique sur un drop.
-     * Crée un nouvel ItemStack avec le matériau fondu.
-     */
     private ItemStack applySmelt(ItemStack drop, boolean smeltEnabled) {
         if (!smeltEnabled) return drop;
         Material smelted = SMELT_MAP.get(drop.getType());
@@ -901,7 +890,6 @@ public class CustomItemListener implements Listener {
     private void applyDurability(Player p, ItemStack hand, CustomItemType type, int usage) {
         if (usage == 0) return;
 
-        // Toujours lire depuis l'inventaire — la référence "hand" peut être obsolète
         ItemStack current = p.getInventory().getItemInMainHand();
         if (current != null && CustomItemManager.getType(current) == type) {
             hand = current;
@@ -913,7 +901,6 @@ public class CustomItemListener implements Listener {
             return;
         }
 
-        // Unbreaking : chaque utilisation a une chance de ne pas user
         int unbreakingLevel = hand.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.UNBREAKING);
         int realUsage = 0;
         for (int i = 0; i < usage; i++) {
@@ -930,8 +917,7 @@ public class CustomItemListener implements Listener {
                 p.sendMessage("§cTon §f" + type.getDisplayName() + " §cs'est cassé !");
                 p.playSound(p.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1f);
             } else {
-                // Réparable → reste à 0, bloqué
-                p.getInventory().setItemInMainHand(CustomItemManager.useDurability(hand, dur)); // force à 0
+                p.getInventory().setItemInMainHand(CustomItemManager.useDurability(hand, dur));
                 p.sendMessage("§cTon §f" + type.getDisplayName() + " §cest épuisé ! Répare-le.");
             }
         } else {
@@ -957,7 +943,7 @@ public class CustomItemListener implements Listener {
     }
 
     private void triggerMinerJob(Player p, Material blockType, org.bukkit.Location loc) {
-        if (playerPlaced.remove(locKey(loc))) return; // bloc posé par un joueur → pas d'XP
+        if (playerPlaced.remove(locKey(loc))) return;
         var action = JobXpTable.MINER_BLOCKS.get(blockType);
         if (action != null)
             SkyBlockPlugin.getInstance().getJobManager()
@@ -965,7 +951,7 @@ public class CustomItemListener implements Listener {
     }
 
     private void triggerBucheronJob(Player p, Material blockType, org.bukkit.Location loc) {
-        if (playerPlaced.remove(locKey(loc))) return; // bloc posé par un joueur → pas d'XP
+        if (playerPlaced.remove(locKey(loc))) return;
         var action = JobXpTable.BUCHERON_LOGS.get(blockType);
         if (action != null)
             SkyBlockPlugin.getInstance().getJobManager()
@@ -977,14 +963,13 @@ public class CustomItemListener implements Listener {
     }
 
     private boolean hasSeed(Player p, Material seed) { return p.getInventory().contains(seed); }
-    private void removeSeed(Player p, Material seed) { p.getInventory().removeItem(new ItemStack(seed, 1)); }
+    private void removeSeed(Player p, Material seed)  { p.getInventory().removeItem(new ItemStack(seed, 1)); }
 
     // ════════════════════════════════════════════════
     //  ACTIONBAR VENTE
     // ════════════════════════════════════════════════
 
     private void sendSellActionBar(Player p, long earned) {
-        // Affiche via JobManager.displaySellCoins pour s'intégrer à l'ActionBar des métiers
         SkyBlockPlugin.getInstance().getJobManager().displaySellCoins(p, earned);
     }
 

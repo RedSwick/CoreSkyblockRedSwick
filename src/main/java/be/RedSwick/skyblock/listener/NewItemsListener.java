@@ -24,13 +24,19 @@ import java.util.*;
  * - Anneau d'XP (offhand)
  * - Sac de graines
  * - Sac de butin
- * - Sacoche de marchand
+ * - Sacoche de marchand  ← pickup géré par MerchantPouchTickListener (pas ici)
  * - Cristal d'XP
  * - Chunk Hopper
+ *
+ * FIX : onPickupWithPouch supprimé — doublon avec MerchantPouchTickListener.onPickup.
+ *       MerchantPouchTickListener a le cache UUID actif → plus efficace et sans double-vente.
  */
 public class NewItemsListener implements Listener {
 
     private final SkyBlockPlugin plugin = SkyBlockPlugin.getInstance();
+
+    // Cooldown cristal d'XP anti double-clic
+    private static final Map<UUID, Long> crystalCooldown = new HashMap<>();
 
     // ════════════════════════════════════════════════
     //  SEAU D'EAU INFINI
@@ -82,13 +88,13 @@ public class NewItemsListener implements Listener {
         caughtItem.setItemStack(drop);
 
         // XP pêcheur x3 (l'event vanilla donne déjà x1, on ajoute x2 de plus)
-        var jobManager = plugin.getJobManager();
         var action = be.RedSwick.skyblock.job.JobXpTable.PECHEUR_FISH.get(drop.getType());
         if (action != null) {
-            jobManager.rewardAction(p, PlayerJob.PECHEUR, action.xp() * 2.0, action.coins() * 2.0);
+            plugin.getJobManager().rewardAction(p, PlayerJob.PECHEUR,
+                    action.xp() * 2.0, action.coins() * 2.0);
         }
 
-        // Dura filet
+        // Durabilité filet
         ItemStack updated = CustomItemManager.useDurability(hand, 1);
         if (updated == null) {
             p.getInventory().setItemInMainHand(null);
@@ -123,7 +129,6 @@ public class NewItemsListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onEntityKilledBySword(EntityDeathEvent event) {
-        Entity entity = event.getEntity();
         Player killer = event.getEntity().getKiller();
         if (killer == null) return;
 
@@ -139,7 +144,7 @@ public class NewItemsListener implements Listener {
                 List<ItemStack> toRemove = new ArrayList<>();
                 for (ItemStack drop : event.getDrops()) {
                     if (drop == null) continue;
-                    long earned = be.RedSwick.skyblock.customitem.SellWandHelper.sellStack(killer, drop, 1.0);
+                    long earned = SellWandHelper.sellStack(killer, drop, 1.0);
                     if (earned > 0) {
                         total += earned;
                         toRemove.add(drop);
@@ -156,8 +161,7 @@ public class NewItemsListener implements Listener {
 
     // ════════════════════════════════════════════════
     //  ANNEAU D'XP — offhand bonus
-    // Appliqué dans JobManager.rewardAction via getRingBonus()
-    // Ici on gère juste la vérification d'équipement
+    //  Appliqué dans JobManager.rewardAction via getRingBonus()
     // ════════════════════════════════════════════════
 
     public static double getRingBonus(Player p, PlayerJob job) {
@@ -199,7 +203,7 @@ public class NewItemsListener implements Listener {
 
         double xp = type.getCrystalXp();
         plugin.getJobManager().rewardAction(p, randomJob, xp, 0);
-        p.sendMessage("§b✦ §fCristal d'XP §b→ §a+" + (int)xp
+        p.sendMessage("§b✦ §fCristal d'XP §b→ §a+" + (int) xp
                 + " XP §7en §f" + randomJob.getDisplay() + " §b✦");
         p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.5f);
 
@@ -210,7 +214,6 @@ public class NewItemsListener implements Listener {
             else p.getInventory().setItemInMainHand(null);
         });
     }
-    private static final java.util.Map<UUID, Long> crystalCooldown = new java.util.HashMap<>();
 
     // ════════════════════════════════════════════════
     //  SAC DE GRAINES
@@ -234,7 +237,7 @@ public class NewItemsListener implements Listener {
                 p.openInventory(SeedBagGUI.create(p, bagId)));
     }
 
-    /** Quand un joueur reçoit une graine dans l'inventaire, aller dans le sac si présent. */
+    /** Quand un joueur reçoit une graine dans l'inventaire → redirige dans le sac si présent. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPickupSeed(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player p)) return;
@@ -253,7 +256,7 @@ public class NewItemsListener implements Listener {
             if (bagId == null) continue;
             LootBagData.get().addToSeedBag(bagId, item.getType(), item.getAmount());
             event.setCancelled(true);
-            p.sendActionBar("§2+§f" + item.getAmount() + " §7→ §2Sac de Graines");
+            ChatUtil.actionBar(p, "§2+§f" + item.getAmount() + " §7→ §2Sac de Graines");
             return;
         }
     }
@@ -303,7 +306,7 @@ public class NewItemsListener implements Listener {
 
         final ItemStack finalHand = hand;
         Bukkit.getScheduler().runTask(plugin, () ->
-                p.openInventory(be.RedSwick.skyblock.customitem.LootBagGUI.create(p, BagIdUtil.getBagId(finalHand))));
+                p.openInventory(LootBagGUI.create(p, BagIdUtil.getBagId(finalHand))));
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -318,25 +321,21 @@ public class NewItemsListener implements Listener {
             ItemStack inv = contents[i];
             if (CustomItemManager.getType(inv) != CustomItemType.LOOT_BAG) continue;
 
-            // Lire l'UUID directement sur l'item en inventaire (pas de clone)
             UUID bagId = BagIdUtil.getBagId(inv);
             if (bagId == null) {
-                // Assigner UUID si manquant
                 ItemStack withId = BagIdUtil.ensureId(inv.clone());
                 p.getInventory().setItem(i, withId);
                 bagId = BagIdUtil.getBagId(withId);
             }
             if (bagId == null) continue;
 
-            // Vérifier si ce matériau est filtré dans le sac
             Map<Material, Long> bagContents = LootBagData.get().getLootBagContents(bagId);
             if (!bagContents.containsKey(mat)) continue;
 
-            // Stocker dans le sac (illimité)
             LootBagData.get().addToLootBag(bagId, mat, item.getAmount());
             event.setCancelled(true);
             long total = LootBagData.get().getLootBagContents(bagId).getOrDefault(mat, 0L);
-            p.sendActionBar("§6+" + item.getAmount() + " " + mat.name().replace("_"," ")
+            ChatUtil.actionBar(p, "§6+" + item.getAmount() + " " + mat.name().replace("_", " ")
                     + " §8(§6" + String.format("%,d", total) + "§8) §7→ §6Sac de Butin");
             return;
         }
@@ -344,29 +343,10 @@ public class NewItemsListener implements Listener {
 
     // ════════════════════════════════════════════════
     //  SACOCHE DE MARCHAND
+    //  FIX : onPickupWithPouch SUPPRIMÉ — doublon avec MerchantPouchTickListener.onPickup
+    //  MerchantPouchTickListener maintient un cache UUID actif et gère cet event
+    //  avec priorité HIGH. Garder les deux causait une double vente possible.
     // ════════════════════════════════════════════════
-
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onPickupWithPouch(EntityPickupItemEvent event) {
-        if (!(event.getEntity() instanceof Player p)) return;
-        ItemStack item = event.getItem().getItemStack();
-
-        // Vérifier si le joueur a une sacoche active dans l'inventaire
-        for (ItemStack inv : p.getInventory().getContents()) {
-            if (CustomItemManager.getType(inv) != CustomItemType.MERCHANT_POUCH) continue;
-            inv = BagIdUtil.ensureId(inv);
-            UUID pouchId = BagIdUtil.getBagId(inv);
-            if (MerchantPouchData.get().isExpired(pouchId)) continue;
-
-            // Vendre automatiquement
-            long earned = SellWandHelper.sellStack(p, item, 1.0);
-            if (earned > 0) {
-                event.setCancelled(true);
-                plugin.getJobManager().displaySellCoins(p, earned);
-            }
-            return;
-        }
-    }
 
     // ════════════════════════════════════════════════
     //  CHUNK HOPPER — placement et collecte des drops
@@ -403,7 +383,8 @@ public class NewItemsListener implements Listener {
 
         event.setDropItems(false);
         ChunkHopperManager.get().removeHopper(block.getLocation());
-        block.getWorld().dropItemNaturally(block.getLocation(), CustomItemManager.create(CustomItemType.CHUNK_HOPPER));
+        block.getWorld().dropItemNaturally(block.getLocation(),
+                CustomItemManager.create(CustomItemType.CHUNK_HOPPER));
         p.sendMessage("§7Chunk Hopper récupéré !");
     }
 
