@@ -16,6 +16,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import java.util.Set;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.inventory.BrewEvent;
 import org.bukkit.inventory.ItemStack;
@@ -62,6 +63,13 @@ public class JobListener implements Listener {
             if (statData != null) statData.incrementCropsBroken();
             // Seulement si event non cancelled (houe custom gère elle-même l'XP via triggerFarmerJob)
             if (!cancelled && isMatureCrop(block)) {
+                // Anti-exploit : blocs non-ageables posés par le joueur (canne, cactus, bambou…)
+                if (!(block.getBlockData() instanceof Ageable)) {
+                    String locKey = be.RedSwick.skyblock.listener.CustomItemListener.locKey(block.getLocation());
+                    if (be.RedSwick.skyblock.listener.CustomItemListener.playerPlaced.remove(locKey)) {
+                        return; // Posé par le joueur → pas de récompense
+                    }
+                }
                 JobAction action = JobXpTable.FARMER_CROPS.get(mat);
                 jobManager.rewardAction(player, PlayerJob.FARMER,
                         action.xp(), action.coins());
@@ -207,5 +215,21 @@ public class JobListener implements Listener {
         String name = potionData.name();
         if (name.contains("STRONG") || name.contains("LONG")) return 1.5;
         return 1.0;
+    }
+
+    // ══════════════════════════════════════════════════════
+    //  FARMER — Plantation grandes plantes
+    // ══════════════════════════════════════════════════════
+
+    private static final Set<Material> TALL_PLANT_PLACE = Set.of(
+            Material.SUNFLOWER, Material.LILAC, Material.ROSE_BUSH, Material.PEONY,
+            Material.TALL_GRASS, Material.LARGE_FERN
+    );
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlantTall(BlockPlaceEvent event) {
+        Material mat = event.getBlock().getType();
+        if (!TALL_PLANT_PLACE.contains(mat)) return;
+        jobManager.rewardAction(event.getPlayer(), PlayerJob.FARMER, 0.5, 1);
     }
 }
