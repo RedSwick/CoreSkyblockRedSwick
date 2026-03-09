@@ -351,6 +351,34 @@ public class IslandManager {
             config.set(p + ".home.yaw",   h.getYaw());
             config.set(p + ".home.pitch", h.getPitch());
         }
+        // Homes nommés (sauf "default" déjà dans .home)
+        config.set(p + ".homes", null);
+        for (Map.Entry<String, Location> e : island.getHomes().entrySet()) {
+            if ("default".equals(e.getKey())) continue;
+            Location h = e.getValue();
+            if (h == null || h.getWorld() == null) continue;
+            String path = p + ".homes." + e.getKey();
+            config.set(path + ".world", h.getWorld().getName());
+            config.set(path + ".x", h.getX());
+            config.set(path + ".y", h.getY());
+            config.set(path + ".z", h.getZ());
+            config.set(path + ".yaw", h.getYaw());
+            config.set(path + ".pitch", h.getPitch());
+        }
+        config.set(p + ".guestList", new ArrayList<>(island.getGuestList().stream().map(UUID::toString).toList()));
+        config.set(p + ".bankBalance", island.getBankBalance());
+
+        // Bank log
+        config.set(p + ".bankLog", null);
+        var bankLog = island.getBankLog();
+        for (int i = 0; i < bankLog.size(); i++) {
+            var t = bankLog.get(i);
+            String bp = p + ".bankLog." + i;
+            config.set(bp + ".player",    t.playerName());
+            config.set(bp + ".amount",    t.amount());
+            config.set(bp + ".deposit",   t.deposit());
+            config.set(bp + ".timestamp", t.timestamp());
+        }
     }
 
     // ════════════════════════════════════════════════
@@ -404,6 +432,43 @@ public class IslandManager {
                                 (float) config.getDouble(key + ".home.yaw"),
                                 (float) config.getDouble(key + ".home.pitch")));
                     }
+                }
+                // Homes nommés
+                if (config.isConfigurationSection(key + ".homes")) {
+                    for (String homeName : config.getConfigurationSection(key + ".homes").getKeys(false)) {
+                        String path = key + ".homes." + homeName;
+                        World hw = Bukkit.getWorld(config.getString(path + ".world", "skyblock"));
+                        if (hw != null) {
+                            Location loc = new Location(hw,
+                                    config.getDouble(path + ".x"),
+                                    config.getDouble(path + ".y"),
+                                    config.getDouble(path + ".z"),
+                                    (float) config.getDouble(path + ".yaw"),
+                                    (float) config.getDouble(path + ".pitch"));
+                            island.setHome(homeName, loc);
+                        }
+                    }
+                }
+                // Invités
+                for (String guestUuid : config.getStringList(key + ".guestList")) {
+                    try { island.addGuest(UUID.fromString(guestUuid)); } catch (Exception ignored) {}
+                }
+                island.setBankBalance(config.getDouble(key + ".bankBalance", 0));
+
+                // Bank log
+                if (config.isConfigurationSection(key + ".bankLog")) {
+                    var logSection = config.getConfigurationSection(key + ".bankLog");
+                    List<Island.BankTransaction> entries = new ArrayList<>();
+                    for (String idx : logSection.getKeys(false)) {
+                        String bp = key + ".bankLog." + idx;
+                        entries.add(new Island.BankTransaction(
+                                config.getString(bp + ".player", "?"),
+                                config.getLong(bp + ".amount", 0),
+                                config.getBoolean(bp + ".deposit", true),
+                                config.getLong(bp + ".timestamp", 0)
+                        ));
+                    }
+                    island.loadBankLog(entries);
                 }
 
                 // Nom

@@ -274,4 +274,19 @@ public class PlayerData {
     public void incrementCropsBroken()     { cropsBroken++;  dirty = true; }
     public void addCropsBroken(int amount) { if (amount > 0) { cropsBroken += amount; dirty = true; } }
     public void setCropsBroken(long v)     { cropsBroken = v; dirty = true; }
+
+    // ===== DAILY REWARD =====
+    private long lastDailyReward = 0;  // epoch ms du dernier claim
+    private int  dailyStreak     = 0;  // série de jours consécutifs
+
+    public long getLastDailyReward()       { return lastDailyReward; }
+    public void setLastDailyReward(long v) { if (this.lastDailyReward != v) { this.lastDailyReward = v; dirty = true; } }
+    public int  getDailyStreak()           { return dailyStreak; }
+    public void setDailyStreak(int v)      { if (this.dailyStreak != v) { this.dailyStreak = v; dirty = true; } }
+
+    // ===== VOTE =====
+    private long lastVote = 0;  // epoch ms du dernier vote
+
+    public long getLastVote()       { return lastVote; }
+    public void setLastVote(long v) { if (this.lastVote != v) { this.lastVote = v; dirty = true; } }
 }

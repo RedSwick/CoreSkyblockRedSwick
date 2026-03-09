@@ -142,7 +142,9 @@ public class ShopGUI {
         Inventory inv = Bukkit.createInventory(null, 54, title);
         fillBorder(inv, Material.GRAY_STAINED_GLASS_PANE);
 
-        List<ShopItem> items = cat.getItems();
+        List<ShopItem> items = be.RedSwick.skyblock.config.ShopConfig.getItems(cat) != null
+                ? be.RedSwick.skyblock.config.ShopConfig.getItems(cat)
+                : cat.getItems();
         int from = (page - 1) * PAGE_SIZE;
         int to   = Math.min(from + PAGE_SIZE, items.size());
 
@@ -343,7 +345,7 @@ public class ShopGUI {
         meta.setDisplayName(cat.getDisplayName());
         meta.setLore(List.of(
                 "§8▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬",
-                "§7" + cat.getItems().size() + " articles",
+                "§7" + (be.RedSwick.skyblock.config.ShopConfig.getItems(cat) != null ? be.RedSwick.skyblock.config.ShopConfig.getItems(cat).size() : cat.getItems().size()) + " articles",
                 "§eClic pour ouvrir"
         ));
         item.setItemMeta(meta);

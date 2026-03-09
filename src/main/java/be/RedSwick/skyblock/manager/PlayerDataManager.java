@@ -94,6 +94,9 @@ public class PlayerDataManager {
             data.setPlaytimeTicks(cfg.getLong("stats.playtimeTicks", 0));
             data.setTotalCoinsEarned(cfg.getLong("stats.totalCoinsEarned", 0));
             data.setCropsBroken(cfg.getLong("stats.cropsBroken", 0));
+            data.setLastDailyReward(cfg.getLong("daily.lastClaim", 0));
+            data.setDailyStreak(cfg.getInt("daily.streak", 0));
+            data.setLastVote(cfg.getLong("vote.lastVote", 0));
         }
 
         // Données fraîches du disque → pas dirty
@@ -261,6 +264,9 @@ public class PlayerDataManager {
         cfg.set("stats.playtimeTicks",    data.getPlaytimeTicks());
         cfg.set("stats.totalCoinsEarned", data.getTotalCoinsEarned());
         cfg.set("stats.cropsBroken",      data.getCropsBroken());
+        cfg.set("daily.lastClaim",        data.getLastDailyReward());
+        cfg.set("daily.streak",           data.getDailyStreak());
+        cfg.set("vote.lastVote",          data.getLastVote());
 
         try {
             cfg.save(file);

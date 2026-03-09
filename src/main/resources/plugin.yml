@@ -2,6 +2,7 @@ name: CoreSkyblock
 version: 1.0
 main: be.RedSwick.skyblock.SkyBlockPlugin
 api-version: '1.21'
+softdepend: [WorldEdit]
 
 commands:
   bal:
@@ -97,6 +98,12 @@ commands:
   serveropen:
     description: Ouvrir le serveur
     usage: /serveropen
+  daily:
+    description: Récompense quotidienne
+    usage: /daily [gui]
+  vote:
+    description: Récompense vote (cooldown 24h)
+    usage: /vote
 
 permissions:
   arcanium.admin:

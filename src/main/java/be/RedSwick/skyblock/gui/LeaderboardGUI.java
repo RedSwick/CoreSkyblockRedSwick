@@ -9,9 +9,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * GUI /classement — affiche le top 10 de chaque catégorie.
@@ -67,11 +69,7 @@ public class LeaderboardGUI {
         LeaderboardManager lm = SkyBlockPlugin.getInstance().getLeaderboardManager();
         List<LeaderboardManager.LeaderboardEntry> top = lm.getTop(type);
 
-        String[] medals      = {"§6§l#1", "§7§l#2", "§8§l#3", "§f#4", "§f#5", "§f#6", "§f#7", "§f#8", "§f#9", "§f#10"};
-        Material[] medalMats = {
-                Material.GOLD_BLOCK, Material.IRON_BLOCK, Material.COPPER_BLOCK,
-                Material.STONE, Material.STONE, Material.STONE, Material.STONE, Material.STONE, Material.STONE, Material.STONE
-        };
+        String[] medals = {"§6§l#1", "§7§l#2", "§8§l#3", "§f#4", "§f#5", "§f#6", "§f#7", "§f#8", "§f#9", "§f#10"};
         int[] slots = {10,11,12,13,14,19,20,21,22,23};
 
         // Trouver le rang du viewer
@@ -82,23 +80,31 @@ public class LeaderboardGUI {
         }
 
         for (int i = 0; i < 10; i++) {
-            ItemStack item = new ItemStack(medalMats[i]);
-            ItemMeta m = item.getItemMeta();
-
             if (i < top.size()) {
                 LeaderboardManager.LeaderboardEntry e = top.get(i);
-                m.setDisplayName(medals[i] + " §f" + e.name());
+
+                // Tête du joueur avec sa vraie skin
+                ItemStack item = new ItemStack(Material.PLAYER_HEAD);
+                SkullMeta sm = (SkullMeta) item.getItemMeta();
+                UUID entryUuid = e.uuid();
+                if (entryUuid != null) sm.setOwningPlayer(Bukkit.getOfflinePlayer(entryUuid));
+
+                sm.setDisplayName(medals[i] + " §f" + e.name());
                 List<String> lore = new ArrayList<>();
                 lore.add("§8▬▬▬▬▬▬▬▬▬▬▬▬▬");
                 lore.add("§7" + type.getDisplay() + " : " + type.getColor() + lm.formatValue(type, e.value()));
                 if (e.name().equalsIgnoreCase(viewerName)) lore.add("§a← Vous !");
-                m.setLore(lore);
+                sm.setLore(lore);
+                item.setItemMeta(sm);
+                inv.setItem(slots[i], item);
             } else {
+                ItemStack empty = new ItemStack(Material.SKELETON_SKULL);
+                ItemMeta m = empty.getItemMeta();
                 m.setDisplayName(medals[i] + " §8---");
                 m.setLore(List.of("§7Aucun joueur"));
+                empty.setItemMeta(m);
+                inv.setItem(slots[i], empty);
             }
-            item.setItemMeta(m);
-            inv.setItem(slots[i], item);
         }
 
         // Ton rang si pas dans le top

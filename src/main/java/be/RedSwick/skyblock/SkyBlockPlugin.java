@@ -25,6 +25,8 @@ public final class SkyBlockPlugin extends JavaPlugin {
     private be.RedSwick.skyblock.leaderboard.LeaderboardManager leaderboardManager;
     private SpawnerManager    spawnerManager;
     private BossBarManager    bossBarManager;
+    private be.RedSwick.skyblock.manager.CooldownManager  cooldownManager;
+    private be.RedSwick.skyblock.manager.SchematicManager schematicManager;
 
     @Override
     public void onEnable() {
@@ -41,6 +43,13 @@ public final class SkyBlockPlugin extends JavaPlugin {
         leaderboardManager = new be.RedSwick.skyblock.leaderboard.LeaderboardManager(this);
         spawnerManager    = new SpawnerManager();
         bossBarManager    = new BossBarManager();
+        cooldownManager   = new be.RedSwick.skyblock.manager.CooldownManager();
+        schematicManager  = new be.RedSwick.skyblock.manager.SchematicManager(this);
+
+        // Config & messages
+        be.RedSwick.skyblock.config.PluginConfig.load();
+        be.RedSwick.skyblock.config.Messages.load();
+        be.RedSwick.skyblock.config.ShopConfig.load();
 
         // Init managers moderation — AVANT les listeners
         be.RedSwick.skyblock.customitem.CustomItemConfig.get().init();
@@ -97,6 +106,9 @@ public final class SkyBlockPlugin extends JavaPlugin {
         getCommand("serveropen").setExecutor(new ModerationCommand.ServerOpen());
         getCommand("stafflogs").setExecutor(new StaffLogsCommand());
 
+        getCommand("daily").setExecutor(new be.RedSwick.skyblock.command.DailyCommand());
+        getCommand("vote").setExecutor(new be.RedSwick.skyblock.command.VoteCommand());
+
         // Tab completers
         StaffTabCompleter staffTab = new StaffTabCompleter();
         for (String cmd : List.of("mute","unmute","kick","ban","unban","tempban","warn","warns","tp","tphere","tpisland","vanish","serverclose","serveropen")) {
@@ -121,8 +133,9 @@ public final class SkyBlockPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PermissionsListener(),      this);
         getServer().getPluginManager().registerEvents(new MenuListener(),             this);
         getServer().getPluginManager().registerEvents(new GuiProtectionListener(),    this);
-        getServer().getPluginManager().registerEvents(new be.RedSwick.skyblock.listener.IslandGUIListener(),  this);
-        getServer().getPluginManager().registerEvents(new be.RedSwick.skyblock.listener.IslandFlyListener(),  this);
+        getServer().getPluginManager().registerEvents(new be.RedSwick.skyblock.listener.IslandGUIListener(),      this);
+        getServer().getPluginManager().registerEvents(new be.RedSwick.skyblock.listener.IslandFlyListener(),      this);
+        getServer().getPluginManager().registerEvents(new be.RedSwick.skyblock.listener.IslandBankGUIListener(), this);
         getServer().getPluginManager().registerEvents(new JobListener(),              this);
         getServer().getPluginManager().registerEvents(new ValueBlockListener(),       this);
         getServer().getPluginManager().registerEvents(new MissionListener(),          this);
@@ -141,6 +154,24 @@ public final class SkyBlockPlugin extends JavaPlugin {
         // Refresh classements toutes les 5 minutes
         Bukkit.getScheduler().runTaskTimer(this, () -> leaderboardManager.refreshAll(), 6000L, 6000L);
 
+        // Banque île — intérêts (toutes les X heures)
+        if (be.RedSwick.skyblock.config.PluginConfig.isBankEnabled()
+                && be.RedSwick.skyblock.config.PluginConfig.isBankInterestEnabled()) {
+            int hours = be.RedSwick.skyblock.config.PluginConfig.getBankInterestIntervalHours();
+            long intervalTicks = Math.max(3600L, hours * 3600L * 20L);
+            Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+                double rate = be.RedSwick.skyblock.config.PluginConfig.getBankInterestPercentPerDay() / 100.0;
+                for (be.RedSwick.skyblock.island.Island is : islandManager.getAllIslands()) {
+                    double bal = is.getBankBalance();
+                    if (bal > 0) {
+                        double add = bal * (rate / (24.0 / Math.max(1, hours)));
+                        is.depositBank(add);
+                        islandManager.saveIsland(is);
+                    }
+                }
+            }, intervalTicks, intervalTicks);
+        }
+
         getServer().getPluginManager().registerEvents(new be.RedSwick.skyblock.listener.NewItemsGuiListener(), this);
 
         // Init des managers custom items
@@ -157,6 +188,8 @@ public final class SkyBlockPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new AdminItemListener(),     this);
         getServer().getPluginManager().registerEvents(new StaffLogsListener(),     this);
         getServer().getPluginManager().registerEvents(new ServerCloseListener(),   this);
+
+        getServer().getPluginManager().registerEvents(new be.RedSwick.skyblock.listener.DailyGUIListener(), this);
 
         // Démarre les cycles de spawn pour tous les spawners existants
         Bukkit.getScheduler().runTaskLater(this, spawnerListener::startAllCycles, 40L);
@@ -217,4 +250,6 @@ public final class SkyBlockPlugin extends JavaPlugin {
     public be.RedSwick.skyblock.leaderboard.LeaderboardManager getLeaderboardManager() { return leaderboardManager; }
     public SpawnerManager  getSpawnerManager()      { return spawnerManager; }
     public BossBarManager  getBossBarManager()       { return bossBarManager; }
+    public be.RedSwick.skyblock.manager.CooldownManager  getCooldownManager()  { return cooldownManager; }
+    public be.RedSwick.skyblock.manager.SchematicManager getSchematicManager() { return schematicManager; }
 }

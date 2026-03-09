@@ -21,9 +21,20 @@ public class Island {
 
     // ── Warp & accès ──
     private Location warpLocation  = null;
-    private Location homeLocation  = null;   // point de téléportation home
+    private Location homeLocation  = null;   // point d'accueil par défaut (rétrocompat)
+    private final Map<String, Location> homes = new HashMap<>(); // nom → location (inclut "default" si défini)
     private boolean  isOpen        = false;
     private String   name          = null;   // nom personnalisé de l'île
+
+    // ── Invités (peuvent visiter même si île fermée) ──
+    private final Set<UUID> guestList = new HashSet<>();
+
+    // ── Banque d'île ──
+    private double bankBalance = 0.0;
+    private final List<BankTransaction> bankLog = new ArrayList<>();
+
+    /** Entrée d'historique de la banque d'île. */
+    public record BankTransaction(String playerName, long amount, boolean deposit, long timestamp) {}
 
     // ── Bannis ──
     private final Set<UUID> bannedPlayers = new HashSet<>();
@@ -147,9 +158,76 @@ public class Island {
     public void     setWarpLocation(Location loc) { this.warpLocation = loc; }
     public boolean  hasWarp()          { return warpLocation != null; }
 
-    public Location getHomeLocation()  { return homeLocation; }
-    public void     setHomeLocation(Location loc) { this.homeLocation = loc; }
-    public boolean  hasHome()          { return homeLocation != null; }
+    /** Home par défaut (rétrocompat) — équivaut à getHome("default"). */
+    public Location getHomeLocation()  {
+        if (homeLocation != null) return homeLocation;
+        return homes.get("default");
+    }
+    public void     setHomeLocation(Location loc) {
+        this.homeLocation = loc;
+        if (loc != null) homes.put("default", loc);
+    }
+    public boolean  hasHome()          { return getHomeLocation() != null; }
+
+    /** Tous les homes nommés (inclut "default" si défini). */
+    public Map<String, Location> getHomes() { return new HashMap<>(homes); }
+    public Location getHome(String name) {
+        if (name == null || name.isEmpty()) return getHomeLocation();
+        Location loc = homes.get(name.toLowerCase());
+        return loc != null ? loc : (name.equalsIgnoreCase("default") ? homeLocation : null);
+    }
+    public void setHome(String name, Location loc) {
+        if (name == null || name.isEmpty()) name = "default";
+        String key = name.toLowerCase();
+        if (loc == null) {
+            homes.remove(key);
+            if ("default".equals(key)) homeLocation = null;
+        } else {
+            homes.put(key, loc);
+            if ("default".equals(key)) homeLocation = loc;
+        }
+    }
+    public boolean hasHome(String name) { return getHome(name) != null; }
+
+    /** Invités : peuvent visiter même si l'île est fermée. */
+    public Set<UUID> getGuestList() { return new HashSet<>(guestList); }
+    public void addGuest(UUID uuid) { guestList.add(uuid); }
+    public void removeGuest(UUID uuid) { guestList.remove(uuid); }
+    public boolean isGuest(UUID uuid) { return guestList.contains(uuid); }
+
+    /** Banque d'île (coins partagés). */
+    public double getBankBalance() { return bankBalance; }
+    public void setBankBalance(double amount) { this.bankBalance = Math.max(0, amount); }
+
+    public void depositBank(double amount) {
+        if (amount > 0) bankBalance += amount;
+    }
+    public void depositBank(double amount, String playerName) {
+        depositBank(amount);
+        addBankLog(new BankTransaction(playerName, (long) amount, true, System.currentTimeMillis()));
+    }
+
+    public boolean withdrawBank(double amount) {
+        if (amount <= 0 || amount > bankBalance) return false;
+        bankBalance -= amount;
+        return true;
+    }
+    public boolean withdrawBank(double amount, String playerName) {
+        if (!withdrawBank(amount)) return false;
+        addBankLog(new BankTransaction(playerName, (long) amount, false, System.currentTimeMillis()));
+        return true;
+    }
+
+    /** Historique banque (max 20 entrées). */
+    public List<BankTransaction> getBankLog() { return Collections.unmodifiableList(bankLog); }
+    public void addBankLog(BankTransaction t) {
+        bankLog.add(0, t); // plus récent en premier
+        if (bankLog.size() > 20) bankLog.subList(20, bankLog.size()).clear();
+    }
+    public void loadBankLog(List<BankTransaction> entries) {
+        bankLog.clear();
+        bankLog.addAll(entries);
+    }
 
     public String   getName()          { return name; }
     public void     setName(String n)  { this.name = n; }

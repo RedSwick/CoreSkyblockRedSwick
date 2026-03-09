@@ -77,14 +77,15 @@ public class LeaderboardManager {
                 UUID owner = island.getOwner();
                 String name = Bukkit.getOfflinePlayer(owner).getName();
                 if (name == null) name = owner.toString().substring(0, 8);
-                entries.add(new LeaderboardEntry(name, (long) island.getIsLevel()));
+                entries.add(new LeaderboardEntry(name, (long) island.getIsLevel(), owner));
             }
         } else {
             for (PlayerData data : pdm.getAllFromDisk()) {
-                String name = Bukkit.getOfflinePlayer(data.getUuid()).getName();
-                if (name == null) name = data.getUuid().toString().substring(0, 8);
+                UUID uuid = data.getUuid();
+                String name = Bukkit.getOfflinePlayer(uuid).getName();
+                if (name == null) name = uuid.toString().substring(0, 8);
                 long value = getValue(data, type);
-                entries.add(new LeaderboardEntry(name, value));
+                entries.add(new LeaderboardEntry(name, value, uuid));
             }
         }
 
@@ -253,5 +254,5 @@ public class LeaderboardManager {
         });
     }
 
-    public record LeaderboardEntry(String name, long value) {}
+    public record LeaderboardEntry(String name, long value, UUID uuid) {}
 }

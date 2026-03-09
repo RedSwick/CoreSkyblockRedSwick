@@ -5,6 +5,7 @@ import be.RedSwick.skyblock.listener.SpawnerListener;
 import be.RedSwick.skyblock.manager.PlayerDataManager;
 import be.RedSwick.skyblock.player.PlayerData;
 import be.RedSwick.skyblock.shop.*;
+import be.RedSwick.skyblock.config.ShopConfig;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
@@ -110,7 +111,7 @@ public class ShopListener implements Listener {
         if (idx < 0) return;
 
         int itemIdx = (page - 1) * SLOTS.length + idx;
-        List<ShopItem> items = cat.getItems();
+        List<ShopItem> items = ShopConfig.getItems(cat) != null ? ShopConfig.getItems(cat) : cat.getItems();
         if (itemIdx >= items.size()) return;
         ShopItem si = items.get(itemIdx);
 
@@ -148,7 +149,7 @@ public class ShopListener implements Listener {
         ShopCategory cat     = ShopCategory.values()[parsed[0]];
         int page             = parsed[1];
         int itemIdx          = parsed[2];
-        List<ShopItem> items = cat.getItems();
+        List<ShopItem> items = ShopConfig.getItems(cat) != null ? ShopConfig.getItems(cat) : cat.getItems();
         if (itemIdx >= items.size()) return;
         ShopItem si = items.get(itemIdx);
 
@@ -295,7 +296,7 @@ public class ShopListener implements Listener {
     private void openCat(Player player, ShopCategory cat, int page) {
         PlayerData data = pdm.get(player.getUniqueId());
         if (data == null) return;
-        int max = (int) Math.ceil((double) cat.getItems().size() / (double) ShopGUI.PAGE_SIZE);
+        int max = (int) Math.ceil((double) (ShopConfig.getItems(cat) != null ? ShopConfig.getItems(cat) : cat.getItems()).size() / (double) ShopGUI.PAGE_SIZE);
         final int p = Math.max(1, Math.min(page, Math.max(1, max)));
         Bukkit.getScheduler().runTask(SkyBlockPlugin.getInstance(),
                 () -> player.openInventory(ShopGUI.createCategory(cat, data.getCoins(), data.getGems(), p)));

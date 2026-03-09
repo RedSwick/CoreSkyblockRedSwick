@@ -41,7 +41,7 @@ public class CustomItemListener implements Listener {
     // PlayerMoveEvent se fire à ~20/s par joueur → sans cooldown = 20 getTargetBlock()/s
     // Avec cooldown 3 ticks → max ~6-7 calculs/s, imperceptible visuellement
     private static final Map<UUID, Long> swapCooldown = new ConcurrentHashMap<>();
-    private static final long SWAP_COOLDOWN_MS = 150; // 3 ticks
+    private static final long SWAP_COOLDOWN_MS = 50; // ~1 tick
 
     // Anti-farm : set des locations posées par des joueurs
     public static final Set<String> playerPlaced = Collections.synchronizedSet(new HashSet<>());
@@ -545,11 +545,15 @@ public class CustomItemListener implements Listener {
         }
         if (sellTotal > 0) sendSellActionBar(p, sellTotal);
 
-        if (!SHOVEL_BLOCKS.contains(blockMat) && !AXE_BREAK_BLOCKS.contains(blockMat)) {
-            String locKey = locKey(center.getLocation());
-            if (!playerPlaced.remove(locKey)) {
-                triggerMinerJob(p, blockMat, center.getLocation());
-            }
+        // ── XP JOBS ──
+        // AXE_BREAK_BLOCKS (troncs, planches…) → BUCHERON
+        // MINER_BLOCKS (minerais, pierre…)      → MINEUR
+        // FARMER blocks (canne, cactus…)        → playerPlaced préservé pour JobListener.onBlockBreak
+        // SHOVEL_BLOCKS (dirt, sable…)          → pas d'XP job
+        if (AXE_BREAK_BLOCKS.contains(blockMat)) {
+            triggerBucheronJob(p, blockMat, center.getLocation());
+        } else if (!SHOVEL_BLOCKS.contains(blockMat) && JobXpTable.MINER_BLOCKS.containsKey(blockMat)) {
+            triggerMinerJob(p, blockMat, center.getLocation());
         }
 
         UUID uuid = p.getUniqueId();
@@ -659,15 +663,6 @@ public class CustomItemListener implements Listener {
         }
 
         Material needed = getNeededToolMaterial(blockMat);
-
-        if (needed == Material.DIAMOND_PICKAXE) {
-            Material cur = multiSwapCurrent.get(uuid);
-            if (cur != null && cur != Material.DIAMOND_PICKAXE) {
-                multiSwapCurrent.remove(uuid);
-                p.getInventory().setItemInMainHand(multiSwapOriginal.get(uuid).clone());
-            }
-            return;
-        }
 
         if (needed == multiSwapCurrent.get(uuid)) return;
 

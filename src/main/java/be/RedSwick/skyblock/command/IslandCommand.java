@@ -6,11 +6,14 @@ import be.RedSwick.skyblock.island.*;
 import be.RedSwick.skyblock.listener.IslandFlyListener;
 import be.RedSwick.skyblock.manager.*;
 import be.RedSwick.skyblock.player.*;
+import be.RedSwick.skyblock.config.PluginConfig;
+import be.RedSwick.skyblock.config.Messages;
 import org.bukkit.*;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 
 import java.util.*;
+import java.util.Objects;
 
 public class IslandCommand implements CommandExecutor, TabCompleter {
 
@@ -18,6 +21,7 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
     private final PlayerDataManager      pdm         = SkyBlockPlugin.getInstance().getPlayerDataManager();
     private final WarpManager            warpManager = SkyBlockPlugin.getInstance().getWarpManager();
     private final IslandTeamChatManager  tcManager   = SkyBlockPlugin.getInstance().getTeamChatManager();
+    private final CooldownManager        cooldownManager = SkyBlockPlugin.getInstance().getCooldownManager();
 
     private static final List<String> SUB_COMMANDS = Arrays.asList(
             // existants
@@ -38,7 +42,8 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
             "expel",
             "upgrade", "upgrades",
             "settings",
-            "banlist"
+            "banlist",
+            "bank", "guest"
     );
 
     // ════════════════════════════════════════════════
@@ -56,7 +61,7 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
         return switch (sub) {
             case "create"       -> cmdCreate(player, island);
             case "delete"       -> cmdDelete(player, island);
-            case "go", "home"   -> cmdGo(player, island);
+            case "go", "home"   -> cmdGo(player, island, args);
             case "border"       -> cmdBorder(player, island);
             case "permissions"  -> cmdPermissions(player, island);
             case "invite"       -> cmdInvite(player, island, args);
@@ -76,7 +81,7 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
             case "missions"     -> cmdMissions(player, island);
             // ── NOUVEAUX ──
             case "name"         -> cmdName(player, island, args);
-            case "sethome"      -> cmdSethome(player, island);
+            case "sethome"      -> cmdSethome(player, island, args);
             case "info"         -> cmdInfo(player, island, args);
             case "team"         -> cmdTeam(player, island, args);
             case "teamchat","tc"-> cmdTeamchat(player, island, args);
@@ -89,6 +94,8 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
             case "upgrade","upgrades" -> cmdUpgrade(player, island);
             case "settings"     -> cmdSettings(player, island);
             case "banlist"      -> cmdBanlist(player, island);
+            case "bank"         -> cmdBank(player, island, args);
+            case "guest"        -> cmdGuest(player, island, args);
             default             -> {
                 player.sendMessage("§cCommande inconnue. §e/is §cpour l'aide.");
                 yield true;
@@ -109,9 +116,11 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
         Island   newIsland = manager.createIsland(player.getUniqueId(), center);
 
         int cx = center.getBlockX(), cy = center.getBlockY(), cz = center.getBlockZ();
-        world.getBlockAt(cx, cy - 1, cz).setType(Material.BEDROCK);
-        world.getBlockAt(cx, cy,     cz).setType(Material.GRASS_BLOCK);
-
+        boolean pasted = SkyBlockPlugin.getInstance().getSchematicManager().pasteAt(center);
+        if (!pasted) {
+            world.getBlockAt(cx, cy - 1, cz).setType(Material.BEDROCK);
+            world.getBlockAt(cx, cy,     cz).setType(Material.GRASS_BLOCK);
+        }
         Location spawnLoc = new Location(world, cx + 0.5, cy + 1, cz + 0.5, player.getLocation().getYaw(), 0);
         player.teleport(spawnLoc);
         applyBorder(player, newIsland);
@@ -120,16 +129,37 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
     }
 
     // ════════════════════════════════════════════════
-    //  GO / HOME
+    //  GO / HOME  — /is go | /is home [nom]
     // ════════════════════════════════════════════════
 
-    private boolean cmdGo(Player player, Island island) {
+    private boolean cmdGo(Player player, Island island, String[] args) {
         if (island == null) { player.sendMessage("§cTu n'as pas d'île !"); return true; }
 
-        // Priorité : home perso → warp île → centre
-        Location dest = island.hasHome()
-                ? island.getHomeLocation()
-                : (island.hasWarp() ? island.getWarpLocation() : findSafeSpawn(island.getCenter()));
+        boolean isHome = args.length > 0 && args[0].equalsIgnoreCase("home");
+        String cooldownType = isHome ? "island_home" : "island_go";
+        int cooldownSec = isHome ? PluginConfig.getCooldownIslandHome() : PluginConfig.getCooldownIslandGo();
+        if (cooldownSec > 0) {
+            long rem = cooldownManager.getRemainingSeconds(player.getUniqueId(), cooldownType);
+            if (rem > 0) {
+                player.sendMessage(Messages.get("island.cooldown", "seconds", String.valueOf(rem)));
+                return true;
+            }
+        }
+
+        Location dest;
+        if (isHome && args.length >= 2) {
+            String name = args[1].toLowerCase();
+            dest = island.getHome(name);
+            if (dest == null) {
+                player.sendMessage(Messages.get("island.home-unknown", "name", name));
+                return true;
+            }
+        } else {
+            dest = island.hasHome() ? island.getHomeLocation()
+                    : (island.hasWarp() ? island.getWarpLocation() : findSafeSpawn(island.getCenter()));
+        }
+
+        if (cooldownSec > 0) cooldownManager.setCooldown(player.getUniqueId(), cooldownType, cooldownSec);
 
         boolean othersOnline = island.getAllMembers().stream()
                 .filter(uid -> !uid.equals(player.getUniqueId()))
@@ -141,6 +171,12 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
         applyBorder(player, island);
         player.sendMessage("§aTéléporté sur ton île !");
         return true;
+    }
+
+    private int getMaxHomes(Island island) {
+        if (PluginConfig.isIslandMaxHomesFromUpgrade())
+            return Math.max(PluginConfig.getIslandMaxHomesDefault(), island.getMemberLimit());
+        return PluginConfig.getIslandMaxHomesDefault();
     }
 
     // ════════════════════════════════════════════════
@@ -184,10 +220,10 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
     }
 
     // ════════════════════════════════════════════════
-    //  SETHOME  — /is sethome
+    //  SETHOME  — /is sethome [nom]
     // ════════════════════════════════════════════════
 
-    private boolean cmdSethome(Player player, Island island) {
+    private boolean cmdSethome(Player player, Island island, String[] args) {
         if (island == null) { player.sendMessage("§cTu n'as pas d'île !"); return true; }
         if (!island.hasPermission(player.getUniqueId(), IslandPermission.CREATE_WARP)) {
             player.sendMessage("§cTu n'as pas la permission !"); return true;
@@ -196,9 +232,16 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
         if (atLoc == null || !atLoc.getOwner().equals(island.getOwner())) {
             player.sendMessage("§cTu dois être sur ton île !"); return true;
         }
-        island.setHomeLocation(player.getLocation());
+        String name = (args.length >= 2) ? args[1].toLowerCase() : "default";
+        int maxHomes = getMaxHomes(island);
+        if (island.getHomes().size() >= maxHomes && !island.hasHome(name)) {
+            player.sendMessage(Messages.get("island.homes-max", "max", String.valueOf(maxHomes)));
+            return true;
+        }
+        island.setHome(name, player.getLocation());
         manager.saveIsland(island);
-        player.sendMessage("§a✦ Point d'accueil de l'île défini ici !");
+        if ("default".equals(name)) player.sendMessage("§a✦ Point d'accueil de l'île défini ici !");
+        else player.sendMessage(Messages.get("island.sethome-name-done", "name", name));
         return true;
     }
 
@@ -387,6 +430,10 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
         neo.setName(old.getName());
         if (old.hasWarp())  neo.setWarpLocation(old.getWarpLocation());
         if (old.hasHome())  neo.setHomeLocation(old.getHomeLocation());
+        for (Map.Entry<String, Location> e : old.getHomes().entrySet())
+            neo.setHome(e.getKey(), e.getValue());
+        for (UUID g : old.getGuestList()) neo.addGuest(g);
+        neo.setBankBalance(old.getBankBalance());
 
         // Membres — retirer newOwner (car il devient owner), ajouter oldOwner comme MANAGER
         for (Map.Entry<UUID, IslandRole> e : old.getMembers().entrySet()) {
@@ -481,22 +528,29 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
     private boolean cmdVisit(Player player, String[] args) {
         if (args.length < 2) { player.sendMessage("§cUsage : §e/is visit <joueur>"); return true; }
 
-        // Chercher par pseudo ou nom d'île
+        int cooldownSec = PluginConfig.getCooldownVisit();
+        if (cooldownSec > 0) {
+            long rem = cooldownManager.getRemainingSeconds(player.getUniqueId(), "visit");
+            if (rem > 0) {
+                player.sendMessage(Messages.get("island.cooldown", "seconds", String.valueOf(rem)));
+                return true;
+            }
+        }
+
         OfflinePlayer op = Bukkit.getOfflinePlayer(args[1]);
         Island target = manager.getIsland(op.getUniqueId());
         if (target == null) target = manager.getIslandByMember(op.getUniqueId());
         if (target == null) target = manager.getIslandByName(args[1]);
 
-        if (target == null) { player.sendMessage("§cÎle introuvable pour §e" + args[1] + "§c."); return true; }
-        if (target.isBanned(player.getUniqueId())) { player.sendMessage("§cTu es banni de cette île."); return true; }
-        if (!target.isOpen() && !target.isMember(player.getUniqueId()) && !target.isCoop(player.getUniqueId())) {
-            player.sendMessage("§cCette île est fermée aux visiteurs."); return true;
-        }
-        if (!target.hasWarp()) { player.sendMessage("§cCette île n'a pas de point de visite."); return true; }
+        if (target == null) { player.sendMessage(Messages.get("island.visit-not-found", "name", args[1])); return true; }
+        if (target.isBanned(player.getUniqueId())) { player.sendMessage(Messages.get("island.visit-banned")); return true; }
+        boolean canVisit = target.isOpen() || target.isMember(player.getUniqueId()) || target.isCoop(player.getUniqueId()) || target.isGuest(player.getUniqueId());
+        if (!canVisit) { player.sendMessage(Messages.get("island.visit-closed")); return true; }
+        if (!target.hasWarp()) { player.sendMessage(Messages.get("island.visit-no-warp")); return true; }
 
+        if (cooldownSec > 0) cooldownManager.setCooldown(player.getUniqueId(), "visit", cooldownSec);
         player.teleport(target.getWarpLocation());
-        player.sendMessage("§aTéléporté sur l'île de §e" +
-                Bukkit.getOfflinePlayer(target.getOwner()).getName() + "§a !");
+        player.sendMessage(Messages.get("island.visit-guest-ok", "owner", Bukkit.getOfflinePlayer(target.getOwner()).getName()));
         return true;
     }
 
@@ -553,6 +607,90 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§cTu n'as pas la permission de modifier les paramètres !"); return true;
         }
         player.openInventory(IslandSettingsGUI.create(island));
+        return true;
+    }
+
+    // ════════════════════════════════════════════════
+    //  BANQUE  — /is bank deposit|withdraw <montant>
+    // ════════════════════════════════════════════════
+
+    private boolean cmdBank(Player player, Island island, String[] args) {
+        if (island == null) { player.sendMessage(Messages.get("island.no-island")); return true; }
+        if (!PluginConfig.isBankEnabled()) { player.sendMessage(Messages.get("island.bank-disabled")); return true; }
+        if (!island.hasPermission(player.getUniqueId(), IslandPermission.BANK_WITHDRAW)) {
+            player.sendMessage(Messages.get("island.bank-no-permission")); return true;
+        }
+
+        // /is bank — ouvre le GUI
+        if (args.length < 3) {
+            player.openInventory(IslandBankGUI.create(island));
+            return true;
+        }
+
+        String action = args[1].toLowerCase();
+        long amount;
+        try { amount = Long.parseLong(args[2]); } catch (NumberFormatException e) {
+            player.sendMessage(Messages.get("general.number-invalid")); return true;
+        }
+        if (amount <= 0) { player.sendMessage(Messages.get("general.number-invalid")); return true; }
+
+        PlayerData data = pdm.get(player.getUniqueId());
+        if (data == null) return true;
+
+        if (action.equals("deposit")) {
+            if (data.getCoins() < amount) { player.sendMessage(Messages.get("island.bank-not-enough")); return true; }
+            data.removeCoins(amount);
+            island.depositBank(amount, player.getName());  // log transaction
+            manager.saveIsland(island);
+            player.sendMessage(Messages.get("island.bank-deposit-done", "amount", String.valueOf(amount)));
+        } else if (action.equals("withdraw")) {
+            if (island.getBankBalance() < amount) { player.sendMessage(Messages.get("island.bank-not-enough")); return true; }
+            if (!island.withdrawBank(amount, player.getName())) { player.sendMessage(Messages.get("island.bank-not-enough")); return true; }  // log transaction
+            data.addCoins(amount);
+            manager.saveIsland(island);
+            player.sendMessage(Messages.get("island.bank-withdraw-done", "amount", String.valueOf(amount)));
+        } else {
+            player.sendMessage(Messages.get("island.bank-usage"));
+        }
+        return true;
+    }
+
+    // ════════════════════════════════════════════════
+    //  GUEST  — /is guest add|remove|list [joueur]
+    // ════════════════════════════════════════════════
+
+    private boolean cmdGuest(Player player, Island island, String[] args) {
+        if (island == null) { player.sendMessage(Messages.get("island.no-island")); return true; }
+        if (!island.getOwner().equals(player.getUniqueId())) {
+            player.sendMessage(Messages.get("island.only-owner")); return true;
+        }
+        if (args.length < 2) { player.sendMessage(Messages.get("island.guest-usage")); return true; }
+        String sub = args[1].toLowerCase();
+        switch (sub) {
+            case "add" -> {
+                if (args.length < 3) { player.sendMessage(Messages.get("island.guest-usage")); return true; }
+                OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
+                if (target.getUniqueId().equals(player.getUniqueId())) return true;
+                if (island.isMember(target.getUniqueId()) || island.isCoop(target.getUniqueId())) return true;
+                island.addGuest(target.getUniqueId());
+                manager.saveIsland(island);
+                player.sendMessage(Messages.get("island.guest-add", "player", target.getName() != null ? target.getName() : args[2]));
+            }
+            case "remove" -> {
+                if (args.length < 3) { player.sendMessage(Messages.get("island.guest-usage")); return true; }
+                OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
+                island.removeGuest(target.getUniqueId());
+                manager.saveIsland(island);
+                player.sendMessage(Messages.get("island.guest-remove", "player", target.getName() != null ? target.getName() : args[2]));
+            }
+            case "list" -> {
+                Set<UUID> guests = island.getGuestList();
+                if (guests.isEmpty()) { player.sendMessage(Messages.get("island.guest-list-empty")); return true; }
+                player.sendMessage("§e§lInvités (§7" + guests.size() + "§e) §8: §7" +
+                        guests.stream().map(u -> Bukkit.getOfflinePlayer(u).getName()).filter(Objects::nonNull).reduce((a, b) -> a + ", " + b).orElse(""));
+            }
+            default -> player.sendMessage(Messages.get("island.guest-usage"));
+        }
         return true;
     }
 
@@ -949,6 +1087,7 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
         player.sendMessage("§e/is warp create §8| §e/is warp <joueur>");
         player.sendMessage("§e/is block §8| §e/is recalc §8| §e/is top");
         player.sendMessage("§e/is permissions §8| §e/is missions §8| §e/is banlist");
+        player.sendMessage("§e/is bank deposit|withdraw <montant> §8| §e/is guest add|remove|list");
     }
 
     private IslandRole promoteRole(IslandRole role) {
@@ -966,29 +1105,68 @@ public class IslandCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (!(sender instanceof Player)) return null;
+
+        // ── args[0] : sous-commande ─────────────────────────────────────
         if (args.length == 1) {
             String input = args[0].toLowerCase();
-            return SUB_COMMANDS.stream().filter(s -> s.startsWith(input)).toList();
+            return SUB_COMMANDS.stream()
+                    .filter(s -> s.startsWith(input))
+                    .sorted()
+                    .toList();
         }
+
+        // ── args[1] ──────────────────────────────────────────────────────
         if (args.length == 2) {
             String sub = args[0].toLowerCase();
             String in  = args[1].toLowerCase();
+
+            // Commandes nécessitant un nom de joueur
             if (List.of("invite","kick","ban","unban","promote","demote",
-                    "join","coop","uncoop","expel","transfer","visit").contains(sub)) {
-                return Bukkit.getOnlinePlayers().stream().map(Player::getName)
-                        .filter(n -> n.toLowerCase().startsWith(in)).toList();
+                    "join","coop","uncoop","expel","transfer","visit","info","team").contains(sub)) {
+                return onlinePlayers(in);
             }
+            // /is warp create | <joueur>
             if (sub.equals("warp")) {
                 List<String> opts = new ArrayList<>();
-                opts.add("create");
-                Bukkit.getOnlinePlayers().stream().map(Player::getName)
-                        .filter(n -> n.toLowerCase().startsWith(in)).forEach(opts::add);
+                if ("create".startsWith(in)) opts.add("create");
+                onlinePlayers(in).forEach(opts::add);
                 return opts;
             }
-            if (sub.equals("name")) return List.of("reset");
-            if (sub.equals("info")) return Bukkit.getOnlinePlayers().stream().map(Player::getName)
-                    .filter(n -> n.toLowerCase().startsWith(in)).toList();
+            // /is name reset | <nom>
+            if (sub.equals("name")) {
+                return "reset".startsWith(in) ? List.of("reset") : List.of();
+            }
+            // /is bank deposit|withdraw
+            if (sub.equals("bank")) {
+                return List.of("deposit","withdraw").stream()
+                        .filter(s -> s.startsWith(in)).toList();
+            }
+            // /is guest add|remove|list
+            if (sub.equals("guest")) {
+                return List.of("add","remove","list").stream()
+                        .filter(s -> s.startsWith(in)).toList();
+            }
         }
-        return null;
+
+        // ── args[2] ──────────────────────────────────────────────────────
+        if (args.length == 3) {
+            String sub = args[0].toLowerCase();
+            String in  = args[2].toLowerCase();
+
+            if (sub.equals("guest") && (args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("remove")))
+                return onlinePlayers(in);
+            if (sub.equals("team") && (args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("remove")))
+                return onlinePlayers(in);
+        }
+
+        return List.of();
+    }
+
+    private List<String> onlinePlayers(String prefix) {
+        return Bukkit.getOnlinePlayers().stream()
+                .map(Player::getName)
+                .filter(n -> n.toLowerCase().startsWith(prefix))
+                .sorted()
+                .toList();
     }
 }
