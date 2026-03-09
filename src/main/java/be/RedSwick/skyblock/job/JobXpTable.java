@@ -99,9 +99,20 @@ public class JobXpTable {
         BUCHERON_LOGS.put(Material.CHERRY_LOG,           new JobAction(2.0,  6));
         BUCHERON_LOGS.put(Material.CRIMSON_STEM,         new JobAction(1.2,  4));
         BUCHERON_LOGS.put(Material.WARPED_STEM,          new JobAction(1.2,  4));
-        BUCHERON_LOGS.put(Material.BAMBOO_BLOCK,         new JobAction(0.2,  1));
-        BUCHERON_LOGS.put(Material.BROWN_MUSHROOM_BLOCK, new JobAction(1.0,  3));
-        BUCHERON_LOGS.put(Material.RED_MUSHROOM_BLOCK,   new JobAction(1.0,  3));
+        BUCHERON_LOGS.put(Material.BAMBOO_BLOCK,              new JobAction(0.2,  1));
+        BUCHERON_LOGS.put(Material.BROWN_MUSHROOM_BLOCK,      new JobAction(1.0,  3));
+        BUCHERON_LOGS.put(Material.RED_MUSHROOM_BLOCK,        new JobAction(1.0,  3));
+        // ─── Feuilles ───
+        BUCHERON_LOGS.put(Material.OAK_LEAVES,                new JobAction(0.1,  0));
+        BUCHERON_LOGS.put(Material.BIRCH_LEAVES,              new JobAction(0.1,  0));
+        BUCHERON_LOGS.put(Material.SPRUCE_LEAVES,             new JobAction(0.1,  0));
+        BUCHERON_LOGS.put(Material.JUNGLE_LEAVES,             new JobAction(0.1,  0));
+        BUCHERON_LOGS.put(Material.ACACIA_LEAVES,             new JobAction(0.1,  0));
+        BUCHERON_LOGS.put(Material.DARK_OAK_LEAVES,           new JobAction(0.1,  0));
+        BUCHERON_LOGS.put(Material.MANGROVE_LEAVES,           new JobAction(0.2,  0));
+        BUCHERON_LOGS.put(Material.CHERRY_LEAVES,             new JobAction(0.2,  0));
+        BUCHERON_LOGS.put(Material.AZALEA_LEAVES,             new JobAction(0.1,  0));
+        BUCHERON_LOGS.put(Material.FLOWERING_AZALEA_LEAVES,   new JobAction(0.2,  0));
     }
 
     // ══════════════════════════════════════════════════════

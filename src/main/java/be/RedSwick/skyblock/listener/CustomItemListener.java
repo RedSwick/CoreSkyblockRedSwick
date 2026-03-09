@@ -660,15 +660,6 @@ public class CustomItemListener implements Listener {
 
         Material needed = getNeededToolMaterial(blockMat);
 
-        if (needed == Material.DIAMOND_PICKAXE) {
-            Material cur = multiSwapCurrent.get(uuid);
-            if (cur != null && cur != Material.DIAMOND_PICKAXE) {
-                multiSwapCurrent.remove(uuid);
-                p.getInventory().setItemInMainHand(multiSwapOriginal.get(uuid).clone());
-            }
-            return;
-        }
-
         if (needed == multiSwapCurrent.get(uuid)) return;
 
         multiSwapCurrent.put(uuid, needed);

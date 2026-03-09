@@ -105,7 +105,8 @@ public class NaturalSpawnListener implements Listener {
 
         // ── MONDE "world" ────────────────────────────────────────────────────────
         if (worldName.equals("world")) {
-            if (entity instanceof Animals || ALWAYS_BLOCKED.contains(event.getEntityType())) {
+            // Aucun spawn naturel dans le monde spawn — CUSTOM seul autorisé (commandes admin)
+            if (reason != CreatureSpawnEvent.SpawnReason.CUSTOM) {
                 event.setCancelled(true);
             }
             return;
